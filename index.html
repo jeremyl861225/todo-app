@@ -557,7 +557,7 @@ const FREQS = [
 const FREQ_LABEL = Object.fromEntries(FREQS.map(f=>[f.k,f.label]));
 const WD = ['日','一','二','三','四','五','六'];
 const PALETTE = ['#4E6B57','#B0603A','#6A7FA0','#8A6A9C','#A8874A','#3F7F79','#9A5A64','#6E7B4A'];
-const DEFAULT_CATS = ['教學CR','臨床事務'];
+const DEFAULT_CATS = ['工作','私人'];
 
 /* ---------- 工具 ---------- */
 const $  = (s,r=document)=>r.querySelector(s);
@@ -1180,7 +1180,7 @@ function wireCat(root){
   let prev = sel.value;
   sel.onchange = ()=>{
     if(sel.value === '__new__'){
-      const name = prompt('新類別名稱（例：教學CR、臨床事務）');
+      const name = prompt('新類別名稱（例：工作、私人）');
       const ok = name ? addCategory(name) : null;
       if(ok){
         sel.insertAdjacentHTML('afterbegin','');

@@ -1,2 +1,6 @@
 .DS_Store
 *.log
+
+# 匯入用的排程檔含同事姓名與內部文件連結，repo 是 public，一律不進版控
+imports/
+
