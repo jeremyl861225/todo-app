@@ -53,10 +53,9 @@ header.top{
 }
 .top-in{display:flex;align-items:center;gap:12px;min-height:56px}
 .brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.02em;font-size:16px;white-space:nowrap}
-/* 與主畫面 icon 同一張圖，圓角處理成 app 圖示的樣子 */
-.appicon{display:block;object-fit:contain;background:#EEEEEE;
-  border-radius:22.5%;box-shadow:0 1px 2px rgba(78,64,40,.14)}
-.brand .mk{width:26px;height:26px;flex:none}
+/* 與主畫面 icon 同一個圖案，已去背只留線條 */
+.appicon{display:block;object-fit:contain;width:auto}
+.brand .mk{height:19px;flex:none}
 .top-sp{flex:1}
 .pill{
   display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;
@@ -342,7 +341,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 .authbox{width:100%;max-width:392px;background:var(--card);border:1px solid var(--line);
   border-radius:var(--r-lg);box-shadow:var(--sh-2);padding:28px 24px calc(24px + env(safe-area-inset-bottom))}
 .authbox .lg{display:flex;flex-direction:column;align-items:center;gap:9px;margin:0 0 22px;text-align:center}
-.authbox .lg .lg-icon{width:52px;height:52px}
+.authbox .lg .lg-icon{height:40px;margin-bottom:2px}
 .authbox .lg b{font-size:19px;letter-spacing:.03em}
 .authbox .lg span{font-size:13px;color:var(--muted)}
 .authtabs{display:flex;gap:4px;background:var(--bg2);border-radius:999px;padding:4px;margin:0 0 20px}
@@ -445,7 +444,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 <section id="scr-auth" class="authwrap hide">
   <div class="authbox">
     <div class="lg">
-      <img class="appicon lg-icon" src="icon-192.png" alt="" width="52" height="52">
+      <img class="appicon lg-icon" src="mark.png" alt="" width="314" height="270">
       <b>待辦事項</b>
       <span>重複排程與月曆，跨裝置同步</span>
     </div>
@@ -475,7 +474,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   <header class="top">
     <div class="wrap top-in">
       <div class="brand">
-        <img class="appicon mk" src="icon-192.png" alt="" width="26" height="26">
+        <img class="appicon mk" src="mark.png" alt="" width="314" height="270">
         <span>待辦事項</span>
       </div>
       <div class="top-sp"></div>
@@ -1016,7 +1015,7 @@ function renderList(){
 
   if(!rows.length){
     body.innerHTML = `<div class="empty"><b>${state.filter?'這個類別還沒有排程':'還沒有任何重複排程'}</b>
-      ${state.filter?'換一個類別看看，或新增一筆。':'點右下角「新增排程」，建立每天／每週／每兩週／每月要做的事。'}</div>`;
+      ${state.filter?'換一個類別看看，或新增一筆。':'點右下角「新增排程」，建立每日／每週／每月或自訂間隔要做的事。'}</div>`;
     return;
   }
   const groupOf = s => s.freq === 'biweekly' ? 'custom' : s.freq;   // 舊資料歸到「自訂」
