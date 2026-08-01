@@ -26,6 +26,7 @@
   --sh-2:0 2px 4px rgba(78,64,40,.06), 0 10px 28px rgba(78,64,40,.09);
   --sh-3:0 18px 60px rgba(60,48,28,.22);
   --nav-h:62px;
+  --lane-h:15px; --bar-top:29px;   /* 多日行程橫桿：每層高度、距格子頂端 */
   --font:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
 }
 *{box-sizing:border-box}
@@ -192,7 +193,30 @@ main{padding:20px 0 40px}
   border-bottom:1px solid var(--line-soft)}
 .cal .dow span{text-align:center;font-size:11.5px;color:var(--muted);padding:8px 0;font-weight:600;letter-spacing:.05em}
 .cal .dow span.we{color:var(--hot)}
-.cal .grid{display:grid;grid-template-columns:repeat(7,1fr)}
+.cal .grid{display:flex;flex-direction:column}
+.week{position:relative}
+.wk-days{display:grid;grid-template-columns:repeat(7,1fr)}
+/* 多日行程的橫桿疊在日期格上方，跨欄連成一條 */
+.wk-bars{position:absolute;left:0;right:0;top:var(--bar-top);
+  display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:var(--lane-h);
+  pointer-events:none;z-index:3}
+.bar-ev{
+  pointer-events:auto;margin:0 3px;height:calc(var(--lane-h) - 3px);
+  display:flex;align-items:center;gap:2px;padding:0 8px;border-radius:999px;
+  background:var(--c-soft);color:var(--c);box-shadow:inset 0 0 0 1px var(--c-line);
+  font-size:10.5px;font-weight:600;line-height:1;white-space:nowrap;overflow:hidden;
+  text-align:left;min-width:0;transition:filter .14s;
+}
+.bar-ev:hover{filter:brightness(.96)}
+.bar-ev .bt{overflow:hidden;text-overflow:ellipsis}
+.bar-ev .cont{opacity:.55;font-weight:400;flex:none}
+.bar-ev .star{font-size:9px;flex:none}
+/* 被週界切斷的那一端切平，才看得出是同一條延續下去 */
+.bar-ev.openL{border-top-left-radius:2px;border-bottom-left-radius:2px;margin-left:0;padding-left:5px}
+.bar-ev.openR{border-top-right-radius:2px;border-bottom-right-radius:2px;margin-right:0}
+.bar-ev.done{opacity:.5;text-decoration:line-through}
+.cell .lanes{flex:none;display:block}
+@media(min-width:940px){ .bar-ev{font-size:11px} }
 .cell{
   position:relative;border-right:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);
   min-height:56px;padding:5px 4px 4px;text-align:left;display:flex;flex-direction:column;gap:3px;
@@ -225,6 +249,7 @@ main{padding:20px 0 40px}
 .cchip.evt .cnt{font-weight:400;opacity:.6;margin-right:2px}
 .cmore{font-size:10.5px;color:var(--muted);padding-left:5px}
 @media(min-width:940px){
+  :root{--lane-h:18px; --bar-top:31px}
   .cell{min-height:104px;padding:6px 5px 5px}
   .dots{display:none}
   .cchips{display:flex}
@@ -235,6 +260,7 @@ main{padding:20px 0 40px}
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .legend .lg-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
 .legend .lg-dot.evt{border-radius:1.5px;transform:rotate(45deg)}
+.legend .lg-bar{width:20px;height:7px;border-radius:999px;background:var(--muted);flex:none;opacity:.65}
 .legend .lg-note{margin-left:auto;opacity:.8}
 
 /* day panel */
@@ -553,7 +579,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <section id="p-cal" class="wrap hide">
       <div class="page-head">
         <h1>月曆</h1>
-        <p>與重複排程同步，可勾選完成、加入單一行程；排程本身請至上一頁修改。</p>
+        <p>與重複排程同步，可勾選完成、加入單一行程；多日行程以橫桿呈現。排程本身請至上一頁修改。</p>
       </div>
       <div class="calbar">
         <button class="iconbtn" id="cal-prev" aria-label="上個月">
@@ -573,6 +599,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
           <div class="legend">
             <span><i class="lg-dot"></i>重複排程</span>
             <span><i class="lg-dot evt"></i>單一行程</span>
+            <span><i class="lg-bar"></i>多日行程</span>
             <span class="lg-note">顏色代表類別</span>
           </div>
         </div>
@@ -1114,6 +1141,39 @@ function renderList(){
 /* ============================================================
    繪製：頁面二（月曆）
    ============================================================ */
+/** 一週之內的多日行程，切成該週的區段並排出不重疊的層 */
+const MAX_LANES = 4;
+function weekBars(weekStart){
+  const weekEnd = addDays(weekStart, 6);
+  const segs = [];
+  for(const e of state.events){
+    if(eventSpan(e) < 2) continue;
+    const s = e.date, en = eventEnd(e);
+    if(en < weekStart || s > weekEnd) continue;
+    const segStart = s  > weekStart ? s  : weekStart;
+    const segEnd   = en < weekEnd   ? en : weekEnd;
+    segs.push({
+      e, segStart, segEnd,
+      col: diffDays(segStart, weekStart),
+      len: diffDays(segEnd, segStart) + 1,
+      openL: segStart !== s,      // 左邊被週界切斷
+      openR: segEnd   !== en
+    });
+  }
+  segs.sort((a,b)=> a.col - b.col || b.len - a.len || String(a.e.title).localeCompare(String(b.e.title)));
+  const lanes = [];               // 每層已排到的結束欄（不含）
+  const drawn = [], spill = [];
+  for(const s of segs){
+    let i = 0;
+    while(lanes[i] !== undefined && lanes[i] > s.col) i++;
+    if(i >= MAX_LANES){ spill.push(s); continue; }   // 太多層就退回當成一般方塊
+    lanes[i] = s.col + s.len;
+    s.lane = i;
+    drawn.push(s);
+  }
+  return { drawn, laneCount: lanes.length, spillIds: new Set(spill.map(s=>s.e.id)) };
+}
+
 function renderCal(){
   const y = state.calY, m = state.calM;
   $('#cal-mo').textContent = `${y} 年 ${m+1} 月`;
@@ -1121,13 +1181,40 @@ function renderCal(){
   const first = new Date(y, m, 1);
   const start = new Date(y, m, 1 - first.getDay());
   const today = todayStr();
-  const cells = [];
-  for(let i=0;i<42;i++){
-    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate()+i);
-    const ds = ymd(d);
-    const out = d.getMonth() !== m;
-    const items = itemsOn(ds);
-    const dots = items.slice(0,8).map(it=>{
+
+  // 最後一列整列都不屬於本月就不畫
+  const lastRowStart = new Date(start.getFullYear(), start.getMonth(), start.getDate()+35);
+  const nWeeks = (lastRowStart.getMonth() !== m || lastRowStart.getFullYear() !== y) ? 5 : 6;
+
+  const weeksHtml = [];
+  for(let w = 0; w < nWeeks; w++){
+    const weekStart = ymd(new Date(start.getFullYear(), start.getMonth(), start.getDate() + w*7));
+    const { drawn, laneCount, spillIds } = weekBars(weekStart);
+
+    const bars = drawn.map(s=>{
+      const col = catColor(s.e.category);
+      // 這一段涵蓋的日子全部完成才算完成
+      let allDone = true;
+      for(let k = 0; k < s.len; k++){
+        if(!isDone(s.e.id, addDays(s.segStart, k))){ allDone = false; break; }
+      }
+      const style = `grid-column:${s.col+1}/span ${s.len};grid-row:${s.lane+1};`
+                  + `--c:${col};--c-soft:${hexRgba(col,.16)};--c-line:${hexRgba(col,.45)}`;
+      return `<button class="bar-ev ${s.openL?'openL':''} ${s.openR?'openR':''} ${allDone?'done':''}"
+        style="${style}" data-e="${esc(s.e.id)}" data-d="${s.segStart}">
+        ${s.openL?'<span class="cont">▸</span>':''}${s.e.important?STAR:''}<span class="bt">${esc(s.e.title)}</span>
+      </button>`;
+    }).join('');
+
+    const cells = [];
+    for(let i = 0; i < 7; i++){
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + w*7 + i);
+      const ds = ymd(d);
+      const out = d.getMonth() !== m;
+      // 已經畫成橫桿的多日行程，不再重複出現在格子裡
+      const items = itemsOn(ds).filter(it =>
+        !(it.kind === 'event' && it.span > 1 && !spillIds.has(it.row.id)));
+      const dots = items.slice(0,8).map(it=>{
       const done = isDone(it.row.id, ds);
       const col = catColor(it.row.category);
       const ev = it.kind === 'event' ? ' evt' : '';
@@ -1147,17 +1234,21 @@ function renderCal(){
       return `<span class="cchip evt${cont} ${done?'done':''}" style="${style}">${
         it.span>1 && !it.first ? '<b class="cnt">▸</b>' : ''}${st}${esc(t)}</span>`;
     }).join('');
-    const more = items.length>3 ? `<span class="cmore">+${items.length-3}</span>` : '';
-    cells.push(`<button class="cell ${out?'out':''} ${ds===today?'today':''} ${ds===state.selDate?'sel':''}" data-d="${ds}">
-      <span class="dn">${d.getDate()}</span>
-      <span class="dots">${dots}</span>
-      <span class="cchips">${chips}${more}</span>
-    </button>`);
+      const more = items.length>3 ? `<span class="cmore">+${items.length-3}</span>` : '';
+      cells.push(`<button class="cell ${out?'out':''} ${ds===today?'today':''} ${ds===state.selDate?'sel':''}" data-d="${ds}">
+        <span class="dn">${d.getDate()}</span>
+        <span class="lanes" style="height:calc(var(--lane-h) * ${laneCount})"></span>
+        <span class="dots">${dots}</span>
+        <span class="cchips">${chips}${more}</span>
+      </button>`);
+    }
+    weeksHtml.push(`<div class="week">
+      <div class="wk-days">${cells.join('')}</div>
+      <div class="wk-bars">${bars}</div>
+    </div>`);
   }
-  // 若最後一列整列都不屬於本月，就不畫（避免多一列灰格）
-  const lastRowStart = new Date(start.getFullYear(), start.getMonth(), start.getDate()+35);
-  if(lastRowStart.getMonth() !== m || lastRowStart.getFullYear() !== y) cells.length = 35;
-  $('#cal-grid').innerHTML = cells.join('');
+  $('#cal-grid').innerHTML = weeksHtml.join('');
+
   $$('.cell', $('#cal-grid')).forEach(c=>c.onclick = ()=>{
     state.selDate = c.dataset.d;
     const d = parseYmd(state.selDate);
@@ -1165,6 +1256,17 @@ function renderCal(){
       state.calY = d.getFullYear(); state.calM = d.getMonth();
     }
     renderCal(); renderDay();
+  });
+  $$('.bar-ev', $('#cal-grid')).forEach(b=>b.onclick = ev=>{
+    ev.stopPropagation();
+    const e = state.events.find(x=>x.id===b.dataset.e);
+    if(!e) return;
+    // 選取日還在這個行程範圍內就沿用，否則跳到這一段的第一天
+    const d = (state.selDate >= e.date && state.selDate <= eventEnd(e))
+      ? state.selDate : b.dataset.d;
+    state.selDate = d;
+    renderCal(); renderDay();
+    openDetail({kind:'event', row:e, mode:'calendar', date:d});
   });
   renderDay();
 }
