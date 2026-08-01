@@ -23,8 +23,12 @@ create table if not exists public.schedules (
   title       text not null,
   description text default '',
   freq        text not null check (freq in ('daily','weekly','biweekly','monthly','custom')),
-  weekday     int,          -- 0=週日 … 6=週六（每週／自訂「每 N 週」用）
-  month_day   int,          -- 1..31（每月／自訂「每 N 個月」用）
+  weekday     int,          -- 0=週日 … 6=週六（每週／自訂「每 N 週」／每月第 N 個星期幾用）
+  month_mode  text check (month_mode is null or month_mode in ('day','nth')),
+                            -- 每月的落點：'day'=幾號、'nth'=第 N 個星期幾
+  week_of_month int check (week_of_month is null or week_of_month in (1,2,3,4,-1)),
+                            -- 1..4=第一～第四個，-1=最後一個
+  month_day   int,          -- 1..31（month_mode='day' 時用）
   interval_n  int,          -- 自訂：間隔數 N
   custom_unit text check (custom_unit is null or custom_unit in ('day','week','month')),
   anchor_date date,         -- 舊資料的每兩週起算日，新資料一律用 start_date

@@ -366,6 +366,7 @@ input[type=date]::-webkit-calendar-picker-indicator:hover{opacity:.8}
 select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23978E7E' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 11px center;background-size:16px;padding-right:34px}
 .seg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.seg.two{grid-template-columns:repeat(2,1fr)}
 .seg button{height:38px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--card2);
   font-size:13.5px;font-weight:600;color:var(--ink2);transition:all .15s;padding:0 4px}
 .seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
@@ -751,6 +752,23 @@ function firstWeekdayOnOrAfter(from, wd){
   const d = parseYmd(from);
   return addDays(from, ((Number(wd)||0) - d.getDay() + 7) % 7);
 }
+/** 這天是不是「當月第 n 個星期 wd」；n = -1 表示最後一個 */
+function isNthWeekday(d, wd, n){
+  if(d.getDay() !== Number(wd)) return false;
+  if(Number(n) === -1) return d.getDate() + 7 > daysInMonth(d.getFullYear(), d.getMonth());
+  return Math.floor((d.getDate() - 1) / 7) + 1 === Number(n);
+}
+/** 每月的落點：依 month_mode 決定是「幾號」還是「第幾個星期幾」 */
+function monthDayMatches(s, d){
+  return s.month_mode === 'nth'
+    ? isNthWeekday(d, s.weekday, s.week_of_month)
+    : d.getDate() === effMonthDay(d, s.month_day);
+}
+const ORDINALS = [
+  {v:1, label:'第一個'}, {v:2, label:'第二個'}, {v:3, label:'第三個'},
+  {v:4, label:'第四個'}, {v:-1, label:'最後一個'}
+];
+const ORD_LABEL = Object.fromEntries(ORDINALS.map(o=>[o.v, o.label]));
 function occursOn(s, dateStr){
   const base = s.start_date || s.anchor_date;
   if(base && dateStr < base) return false;
@@ -759,7 +777,7 @@ function occursOn(s, dateStr){
   switch(s.freq){
     case 'daily':   return true;
     case 'weekly':  return d.getDay() === Number(s.weekday);
-    case 'monthly': return d.getDate() === effMonthDay(d, s.month_day);
+    case 'monthly': return monthDayMatches(s, d);
     case 'biweekly': {            // 舊資料：等同「自訂：每 2 週」
       const a = s.anchor_date || s.start_date;
       if(!a) return d.getDay() === Number(s.weekday);
@@ -780,7 +798,7 @@ function occursOn(s, dateStr){
         return k >= 0 && (k / 7) % n === 0;
       }
       if(unit === 'month'){
-        if(d.getDate() !== effMonthDay(d, s.month_day)) return false;
+        if(!monthDayMatches(s, d)) return false;
         const b = parseYmd(from);
         const k = (d.getFullYear() - b.getFullYear()) * 12 + (d.getMonth() - b.getMonth());
         return k >= 0 && k % n === 0;
@@ -792,18 +810,22 @@ function occursOn(s, dateStr){
 }
 function whenLabel(s){
   const wd = WD[Number(s.weekday) || 0];
+  // 每月的落點文字：「15 號」或「第二個週三」
+  const mday = () => s.month_mode === 'nth'
+    ? `${ORD_LABEL[Number(s.week_of_month)] || '第一個'}週${wd}`
+    : `${Number(s.month_day)||1} 號`;
   switch(s.freq){
     case 'daily':    return '每日';
     case 'weekly':   return `每週${wd}`;
-    case 'monthly':  return `每月 ${Number(s.month_day)||1} 號`;
+    case 'monthly':  return `每月${s.month_mode==='nth' ? '' : ' '}${mday()}`;
     case 'biweekly': return `每 2 週${wd}`;
     case 'custom': {
       const n = Math.max(1, Number(s.interval_n)||1);
       const unit = s.custom_unit || 'week';
       if(unit === 'day')   return n === 1 ? '每日' : `每 ${n} 天`;
       if(unit === 'week')  return n === 1 ? `每週${wd}` : `每 ${n} 週${wd}`;
-      if(unit === 'month') return n === 1 ? `每月 ${Number(s.month_day)||1} 號`
-                                          : `每 ${n} 個月 ${Number(s.month_day)||1} 號`;
+      if(unit === 'month') return n === 1 ? `每月${s.month_mode==='nth'?'':' '}${mday()}`
+                                          : `每 ${n} 個月${s.month_mode==='nth'?'的':' '}${mday()}`;
     }
   }
   return '';
@@ -965,7 +987,9 @@ const MIGRATIONS = [
   { file:'2026-08-recurrence.sql',
     checks:[['schedules','end_date,interval_n,custom_unit'], ['events','end_date']] },
   { file:'2026-08-important.sql',
-    checks:[['schedules','important'], ['events','important']] }
+    checks:[['schedules','important'], ['events','important']] },
+  { file:'2026-08-monthly-nth.sql',
+    checks:[['schedules','month_mode,week_of_month']] }
 ];
 async function checkSchema(){
   if(!sb || !session) return;
@@ -1585,6 +1609,7 @@ function openScheduleForm(existing){
   const s = existing || {
     id:uid(), title:'', description:'', freq:'weekly',
     weekday:new Date().getDay(), month_day:new Date().getDate(),
+    month_mode:'day', week_of_month:1,
     start_date:today, end_date:null, interval_n:2, custom_unit:'week',
     time_text:'', category:'', important:false, links:[]
   };
@@ -1610,15 +1635,27 @@ function openScheduleForm(existing){
         </select>
       </div>
       <p class="hint">從「起始日」起算。例如每 2 週、每 3 個月。</p></div>
+    <div class="fld hide" id="w-month"><label>每月的哪一天</label>
+      <div class="seg two" id="f-mmode">
+        <button type="button" data-mm="day" class="${s.month_mode!=='nth'?'on':''}">幾號</button>
+        <button type="button" data-mm="nth" class="${s.month_mode==='nth'?'on':''}">第幾個星期幾</button>
+      </div>
+      <div id="w-md" style="margin-top:9px">
+        <select id="f-md" class="inp">
+          ${Array.from({length:31},(_,i)=>i+1).map(n=>`<option value="${n}" ${Number(s.month_day)===n?'selected':''}>${n} 號</option>`).join('')}
+        </select>
+        <p class="hint">若當月沒有這一天（例如 31 號遇到小月），會落在該月最後一天。</p>
+      </div>
+      <div id="w-nth" class="hide" style="margin-top:9px">
+        <select id="f-nth" class="inp">
+          ${ORDINALS.map(o=>`<option value="${o.v}" ${Number(s.week_of_month||1)===o.v?'selected':''}>${o.label}</option>`).join('')}
+        </select>
+        <p class="hint">再從下面選星期幾。例如「第二個」＋「三」＝每月第二個星期三。</p>
+      </div></div>
     <div class="fld hide" id="w-week"><label>星期幾</label>
       <div class="wk" id="f-wd">
         ${WD.map((w,i)=>`<button type="button" data-w="${i}" class="${(i===0||i===6)?'we':''} ${Number(s.weekday)===i?'on':''}">${w}</button>`).join('')}
       </div></div>
-    <div class="fld hide" id="w-month"><label for="f-md">幾號</label>
-      <select id="f-md" class="inp">
-        ${Array.from({length:31},(_,i)=>i+1).map(n=>`<option value="${n}" ${Number(s.month_day)===n?'selected':''}>${n} 號</option>`).join('')}
-      </select>
-      <p class="hint">若當月沒有這一天（例如 31 號遇到小月），會落在該月最後一天。</p></div>
     <div class="fld"><label for="f-start">起始日 <span style="color:var(--hot)">*</span></label>
       <input id="f-start" class="inp" type="date" value="${esc(startInit)}">
       <p class="hint">這天以前不會出現。</p></div>
@@ -1640,16 +1677,24 @@ function openScheduleForm(existing){
 
   let freq = legacy2w ? 'custom' : s.freq;
   let weekday = Number(s.weekday) || 0;
+  let mmode = s.month_mode === 'nth' ? 'nth' : 'day';
 
   const unitNow = () => $('#f-unit', R).value;
   function syncFreqUI(){
     $$('#f-freq button', R).forEach(b=>b.classList.toggle('on', b.dataset.f===freq));
     const cu = freq === 'custom' ? unitNow() : null;
+    const byMonth = (freq==='monthly' || cu==='month');
     $('#w-custom', R).classList.toggle('hide', freq !== 'custom');
-    $('#w-week',   R).classList.toggle('hide', !(freq==='weekly' || cu==='week'));
-    $('#w-month',  R).classList.toggle('hide', !(freq==='monthly' || cu==='month'));
+    $('#w-month',  R).classList.toggle('hide', !byMonth);
+    // 每月選「第幾個星期幾」時也需要挑星期
+    $('#w-week',   R).classList.toggle('hide',
+      !(freq==='weekly' || cu==='week' || (byMonth && mmode==='nth')));
+    $$('#f-mmode button', R).forEach(b=>b.classList.toggle('on', b.dataset.mm===mmode));
+    $('#w-md',  R).classList.toggle('hide', mmode!=='day');
+    $('#w-nth', R).classList.toggle('hide', mmode!=='nth');
   }
   $$('#f-freq button', R).forEach(b=>b.onclick = ()=>{ freq = b.dataset.f; syncFreqUI(); });
+  $$('#f-mmode button', R).forEach(b=>b.onclick = ()=>{ mmode = b.dataset.mm; syncFreqUI(); });
   $('#f-unit', R).onchange = syncFreqUI;
   $$('#f-wd button', R).forEach(b=>b.onclick = ()=>{
     weekday = Number(b.dataset.w);
@@ -1669,15 +1714,18 @@ function openScheduleForm(existing){
     if(end && end < start){ showFormErr(R, '結束日不能早於起始日。'); $('#f-end',R).focus(); return; }
 
     const unit = freq==='custom' ? unitNow() : null;
-    const useWd = freq==='weekly' || unit==='week';
     const useMd = freq==='monthly' || unit==='month';
+    const nth   = useMd && mmode==='nth';
+    const useWd = freq==='weekly' || unit==='week' || nth;
     const row = {
       id: s.id,
       title,
       description: $('#f-desc', R).value.trim(),
       freq,
       weekday:   useWd ? weekday : null,
-      month_day: useMd ? Number($('#f-md', R).value) : null,
+      month_mode:    useMd ? mmode : null,
+      week_of_month: nth ? Number($('#f-nth', R).value) : null,
+      month_day: (useMd && !nth) ? Number($('#f-md', R).value) : null,
       interval_n:  freq==='custom' ? Number($('#f-int', R).value) : null,
       custom_unit: freq==='custom' ? unit : null,
       anchor_date: null,
@@ -1846,8 +1894,9 @@ function normSchedule(s){
   const title = String(s.title||'').trim();
   if(!title || !freq) return null;
   const unit = freq==='custom' ? (['day','week','month'].includes(s.custom_unit) ? s.custom_unit : 'week') : null;
-  const useWd = freq==='weekly' || freq==='biweekly' || unit==='week';
   const useMd = freq==='monthly' || unit==='month';
+  const nth = useMd && s.month_mode === 'nth';
+  const useWd = freq==='weekly' || freq==='biweekly' || unit==='week' || nth;
   const start = isYmd(s.start_date) ? s.start_date
               : (isYmd(s.anchor_date) ? s.anchor_date : todayStr());
   const end = isYmd(s.end_date) && s.end_date >= start ? s.end_date : null;
@@ -1857,7 +1906,9 @@ function normSchedule(s){
     description: String(s.description||''),
     freq,
     weekday:   useWd ? (Number(s.weekday)||0) : null,
-    month_day: useMd ? Math.min(31, Math.max(1, Number(s.month_day)||1)) : null,
+    month_mode:    useMd ? (nth ? 'nth' : 'day') : null,
+    week_of_month: nth ? ([1,2,3,4,-1].includes(Number(s.week_of_month)) ? Number(s.week_of_month) : 1) : null,
+    month_day: (useMd && !nth) ? Math.min(31, Math.max(1, Number(s.month_day)||1)) : null,
     interval_n:  freq==='custom' ? Math.max(1, Number(s.interval_n)||1) : null,
     custom_unit: unit,
     anchor_date: freq==='biweekly' ? (s.anchor_date || null) : null,
