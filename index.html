@@ -291,6 +291,14 @@ main{padding:20px 0 40px}
   background:var(--card2);transition:border-color .15s,background .15s;font-size:15px}
 textarea.inp{height:auto;min-height:86px;padding:10px 12px;line-height:1.6;resize:vertical}
 .inp:focus{outline:none;border-color:var(--accent);background:var(--card)}
+/* 日期欄位還沒填時整格（含中間的「/」）都用淡色，才不會只有分隔線是黑的 */
+input[type=date].empty::-webkit-datetime-edit,
+input[type=date].empty::-webkit-datetime-edit-text,
+input[type=date].empty::-webkit-datetime-edit-year-field,
+input[type=date].empty::-webkit-datetime-edit-month-field,
+input[type=date].empty::-webkit-datetime-edit-day-field{color:var(--muted)}
+input[type=date]::-webkit-calendar-picker-indicator{opacity:.45;cursor:pointer}
+input[type=date]::-webkit-calendar-picker-indicator:hover{opacity:.8}
 select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23978E7E' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 11px center;background-size:16px;padding-right:34px}
 .seg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
@@ -1160,6 +1168,16 @@ function renderDay(){
 /* ============================================================
    Modal 基礎
    ============================================================ */
+/** 空的日期欄位整格淡化，含 WebKit 自己畫的「/」分隔線 */
+function wireDateInputs(root){
+  $$('input[type=date]', root).forEach(i=>{
+    const sync = ()=> i.classList.toggle('empty', !i.value);
+    sync();
+    i.addEventListener('input', sync);
+    i.addEventListener('change', sync);
+  });
+}
+
 let closeModal = null;
 function modal({title, body, footer, onClose}){
   if(closeModal) closeModal();
@@ -1176,6 +1194,7 @@ function modal({title, body, footer, onClose}){
     ${footer?`<div class="sh-f">${footer}</div>`:''}
   </div>`;
   $('#modal-root').appendChild(ov);
+  wireDateInputs(ov);
   document.body.style.overflow = 'hidden';
 
   const close = ()=>{
