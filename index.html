@@ -121,6 +121,10 @@ main{padding:20px 0 40px}
 .tag.time{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
 .tag .cd{width:7px;height:7px;border-radius:50%;flex:none}
 .tag.lk{background:#EFEAF0;color:#5B4B62}
+.tag.over{background:#EDE9E1;color:#8A8172}
+.tag.soon{background:var(--hot-soft);color:#7E432A}
+.item.ended{opacity:.62}
+.item.ended .bar{background:var(--muted) !important}
 
 .empty{
   text-align:center;color:var(--muted);font-size:13.5px;padding:38px 20px;
@@ -175,17 +179,32 @@ main{padding:20px 0 40px}
 .dots{display:flex;flex-wrap:wrap;gap:3px;padding:0 1px}
 .dots i{width:6px;height:6px;border-radius:50%;display:block}
 .dots i.done{box-shadow:inset 0 0 0 1px currentColor;background:transparent !important;opacity:.45}
+.dots i.evt{border-radius:1.5px;transform:rotate(45deg)}   /* 單一行程用菱形 */
 .cchips{display:none;flex-direction:column;gap:2px;min-width:0}
 .cchip{font-size:11px;line-height:1.35;padding:2px 5px;border-radius:5px;background:var(--bg2);
   color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   border-left:2.5px solid var(--accent)}
 .cchip.done{opacity:.45;text-decoration:line-through}
+/* 單一行程：圓角實心色塊；重複排程：灰底＋左側色條 */
+.cchip.evt{border-left:none;background:var(--c-soft);color:var(--c);font-weight:600;
+  box-shadow:inset 0 0 0 1px var(--c-line);border-radius:999px;padding:2px 8px}
+.cchip.evt.st{border-radius:999px 3px 3px 999px}
+.cchip.evt.mid{border-radius:3px}
+.cchip.evt.en{border-radius:3px 999px 999px 3px}
+.cchip.evt .cnt{font-weight:400;opacity:.6;margin-right:2px}
 .cmore{font-size:10.5px;color:var(--muted);padding-left:5px}
 @media(min-width:940px){
   .cell{min-height:104px;padding:6px 5px 5px}
   .dots{display:none}
   .cchips{display:flex}
 }
+
+.legend{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:9px 13px;
+  background:var(--card2);border-top:1px solid var(--line-soft);font-size:11.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend .lg-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.legend .lg-dot.evt{border-radius:1.5px;transform:rotate(45deg)}
+.legend .lg-note{margin-left:auto;opacity:.8}
 
 /* day panel */
 .daypanel{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
@@ -201,6 +220,9 @@ main{padding:20px 0 40px}
 .drow{display:flex;align-items:flex-start;gap:9px;padding:9px 10px;border-radius:var(--r-sm);
   border:1px solid var(--line-soft);background:var(--card);transition:background .14s}
 .drow:hover{background:var(--card2)}
+.drow.evt{background:var(--c-soft);border-color:var(--c-line)}
+.drow.evt:hover{background:var(--c-soft);filter:brightness(.985)}
+.tag.ev{background:var(--c-soft);color:var(--c);font-weight:600;box-shadow:inset 0 0 0 1px var(--c-line)}
 .drow.done{opacity:.6}
 .drow.done .dt{text-decoration:line-through}
 .ck{width:22px;height:22px;border-radius:7px;border:1.8px solid var(--line);background:var(--card);
@@ -348,6 +370,12 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   box-shadow:var(--sh-2);animation:rise .2s ease;line-height:1.5}
 .toast.bad{background:#7C382C}
 
+.schemabar{background:var(--hot-soft);border-bottom:1px solid #EBD3C4;color:#7E432A;
+  font-size:13px;line-height:1.65;padding:11px 16px;text-align:center}
+.schemabar b{display:block;font-size:14px;margin-bottom:2px}
+.schemabar code{background:rgba(126,67,42,.1);padding:1px 5px;border-radius:4px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+
 /* setup screen */
 .setup{max-width:620px;margin:0 auto;padding:32px 18px 60px}
 .setup h1{font-size:21px;margin:0 0 6px}
@@ -488,7 +516,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <section id="p-list" class="wrap">
       <div class="page-head">
         <h1>重複排程</h1>
-        <p>每天、每週、每兩週、每月要完成的事。點擊查看細節，可新增／編輯／刪除。</p>
+        <p>每日、每週、每月或自訂間隔要完成的事。點擊查看細節，可新增／編輯／刪除。</p>
       </div>
       <div class="filters" id="fl-list"></div>
       <div id="list-body"></div>
@@ -515,6 +543,11 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <div class="cal">
           <div class="dow"><span class="we">日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span class="we">六</span></div>
           <div class="grid" id="cal-grid"></div>
+          <div class="legend">
+            <span><i class="lg-dot"></i>重複排程</span>
+            <span><i class="lg-dot evt"></i>單一行程</span>
+            <span class="lg-note">顏色代表類別</span>
+          </div>
         </div>
         <div class="daypanel">
           <div class="dh">
@@ -549,12 +582,14 @@ const CONFIG = {
 
 /* ---------- 常數 ---------- */
 const FREQS = [
-  {k:'daily',    label:'每天'},
-  {k:'weekly',   label:'每週'},
-  {k:'biweekly', label:'每兩週'},
-  {k:'monthly',  label:'每月'}
+  {k:'daily',   label:'每日'},
+  {k:'weekly',  label:'每週'},
+  {k:'monthly', label:'每月'},
+  {k:'custom',  label:'自訂'}
 ];
 const FREQ_LABEL = Object.fromEntries(FREQS.map(f=>[f.k,f.label]));
+const UNITS = [{k:'day',label:'天'},{k:'week',label:'週'},{k:'month',label:'個月'}];
+const UNIT_LABEL = Object.fromEntries(UNITS.map(u=>[u.k,u.label]));
 const WD = ['日','一','二','三','四','五','六'];
 const PALETTE = ['#4E6B57','#B0603A','#6A7FA0','#8A6A9C','#A8874A','#3F7F79','#9A5A64','#6E7B4A'];
 const DEFAULT_CATS = ['工作','私人'];
@@ -576,6 +611,14 @@ const diffDays = (a,b) => Math.round((parseYmd(a) - parseYmd(b))/86400000);
 const addDays = (s,n) => { const d=parseYmd(s); d.setDate(d.getDate()+n); return ymd(d); };
 const fmtDate = s => { const d=parseYmd(s); return `${d.getMonth()+1} 月 ${d.getDate()} 日`; };
 
+function hexRgba(hex, a){
+  const h = String(hex||'').replace('#','');
+  const n = h.length === 3 ? h.split('').map(c=>c+c).join('') : h;
+  const r = parseInt(n.slice(0,2),16) || 0,
+        g = parseInt(n.slice(2,4),16) || 0,
+        b = parseInt(n.slice(4,6),16) || 0;
+  return `rgba(${r},${g},${b},${a})`;
+}
 function catColor(name){
   if(!name) return '#A79C88';
   const c = state.categories.find(x=>x.name===name);
@@ -603,38 +646,102 @@ function toast(msg, bad){
 }
 
 /* ---------- 排程展開 ---------- */
+/** 當月沒有這一天時（例如 31 號遇到小月）落在該月最後一天 */
+function effMonthDay(d, md){
+  return Math.min(Number(md)||1, daysInMonth(d.getFullYear(), d.getMonth()));
+}
+/** from 當天或之後，第一個星期幾為 wd 的日期 */
+function firstWeekdayOnOrAfter(from, wd){
+  const d = parseYmd(from);
+  return addDays(from, ((Number(wd)||0) - d.getDay() + 7) % 7);
+}
 function occursOn(s, dateStr){
-  if(s.start_date && dateStr < s.start_date) return false;
+  const base = s.start_date || s.anchor_date;
+  if(base && dateStr < base) return false;
+  if(s.end_date && dateStr > s.end_date) return false;
   const d = parseYmd(dateStr);
   switch(s.freq){
-    case 'daily':    return true;
-    case 'weekly':   return d.getDay() === Number(s.weekday);
-    case 'biweekly': {
-      if(!s.anchor_date) return d.getDay() === Number(s.weekday);
-      return ((diffDays(dateStr, s.anchor_date) % 14) + 14) % 14 === 0;
+    case 'daily':   return true;
+    case 'weekly':  return d.getDay() === Number(s.weekday);
+    case 'monthly': return d.getDate() === effMonthDay(d, s.month_day);
+    case 'biweekly': {            // 舊資料：等同「自訂：每 2 週」
+      const a = s.anchor_date || s.start_date;
+      if(!a) return d.getDay() === Number(s.weekday);
+      return ((diffDays(dateStr, a) % 14) + 14) % 14 === 0;
     }
-    case 'monthly': {
-      const dim = daysInMonth(d.getFullYear(), d.getMonth());
-      return d.getDate() === Math.min(Number(s.month_day)||1, dim);
+    case 'custom': {
+      const n = Math.max(1, Number(s.interval_n) || 1);
+      const unit = s.custom_unit || 'week';
+      const from = base || dateStr;
+      if(unit === 'day'){
+        const k = diffDays(dateStr, from);
+        return k >= 0 && k % n === 0;
+      }
+      if(unit === 'week'){
+        if(d.getDay() !== Number(s.weekday)) return false;
+        const first = firstWeekdayOnOrAfter(from, s.weekday);
+        const k = diffDays(dateStr, first);
+        return k >= 0 && (k / 7) % n === 0;
+      }
+      if(unit === 'month'){
+        if(d.getDate() !== effMonthDay(d, s.month_day)) return false;
+        const b = parseYmd(from);
+        const k = (d.getFullYear() - b.getFullYear()) * 12 + (d.getMonth() - b.getMonth());
+        return k >= 0 && k % n === 0;
+      }
+      return false;
     }
   }
   return false;
 }
 function whenLabel(s){
+  const wd = WD[Number(s.weekday) || 0];
   switch(s.freq){
-    case 'daily':    return '每天';
-    case 'weekly':   return `每週${WD[Number(s.weekday)||0]}`;
-    case 'biweekly': return `每兩週${WD[Number(s.weekday)||0]}`;
+    case 'daily':    return '每日';
+    case 'weekly':   return `每週${wd}`;
     case 'monthly':  return `每月 ${Number(s.month_day)||1} 號`;
+    case 'biweekly': return `每 2 週${wd}`;
+    case 'custom': {
+      const n = Math.max(1, Number(s.interval_n)||1);
+      const unit = s.custom_unit || 'week';
+      if(unit === 'day')   return n === 1 ? '每日' : `每 ${n} 天`;
+      if(unit === 'week')  return n === 1 ? `每週${wd}` : `每 ${n} 週${wd}`;
+      if(unit === 'month') return n === 1 ? `每月 ${Number(s.month_day)||1} 號`
+                                          : `每 ${n} 個月 ${Number(s.month_day)||1} 號`;
+    }
   }
   return '';
+}
+/** 起訖日文字，沒有結束日就只寫起始 */
+function rangeLabel(s){
+  if(!s.start_date && !s.end_date) return '';
+  const a = s.start_date ? fmtDate(s.start_date) : '';
+  if(!s.end_date) return a ? `${a} 起` : '';
+  return `${a} – ${fmtDate(s.end_date)}`;
+}
+/* ---------- 單一行程（可跨多日） ---------- */
+function eventEnd(e){ return e.end_date && e.end_date > e.date ? e.end_date : e.date; }
+function eventSpan(e){ return diffDays(eventEnd(e), e.date) + 1; }
+function eventCovers(e, dateStr){ return dateStr >= e.date && dateStr <= eventEnd(e); }
+function eventWhenLabel(e){
+  const w = d => `${fmtDate(d)}（週${WD[parseYmd(d).getDay()]}）`;
+  return eventSpan(e) > 1 ? `${w(e.date)} – ${w(eventEnd(e))}` : w(e.date);
 }
 /** 某日期的所有項目（排程 + 單一行程），已排序 */
 function itemsOn(dateStr){
   const out = [];
   for(const s of state.schedules) if(occursOn(s, dateStr)) out.push({kind:'schedule', row:s});
-  for(const e of state.events)    if(e.date === dateStr)   out.push({kind:'event', row:e});
-  const rank = {daily:0, weekly:1, biweekly:2, monthly:3};
+  for(const e of state.events){
+    if(!eventCovers(e, dateStr)) continue;
+    const span = eventSpan(e);
+    out.push({
+      kind:'event', row:e, span,
+      dayIndex: diffDays(dateStr, e.date) + 1,
+      first: dateStr === e.date,
+      last:  dateStr === eventEnd(e)
+    });
+  }
+  const rank = {daily:0, weekly:1, custom:2, biweekly:2, monthly:3};
   out.sort((a,b)=>{
     const ta=(a.row.time_text||'').trim(), tb=(b.row.time_text||'').trim();
     if(ta && tb && ta!==tb) return ta.localeCompare(tb);
@@ -755,6 +862,25 @@ async function flushQueue(){
   flushing = false; setSync();
 }
 
+/* ---------- 資料表版本檢查 ----------
+   起訖日與「自訂」頻率需要新欄位；沒升級就會寫入失敗，先擋在前面提醒。 */
+let schemaReady = true;
+async function checkSchema(){
+  if(!sb || !session) return;
+  const a = await sb.from('schedules').select('end_date,interval_n,custom_unit').limit(1);
+  const b = await sb.from('events').select('end_date').limit(1);
+  const err = a.error || b.error;
+  if(!err) return;
+  if(!/column|does not exist|schema/i.test(String(err.message||''))) return;
+  schemaReady = false;
+  const bar = document.createElement('div');
+  bar.className = 'schemabar';
+  bar.innerHTML = `<b>資料表需要升級</b>
+    請到 Supabase → SQL Editor 執行 <code>migrations/2026-08-recurrence.sql</code>，
+    否則新增／修改排程會存不起來。執行完重新整理這個頁面即可。`;
+  document.querySelector('#scr-app').prepend(bar);
+}
+
 /* ---------- 讀取 ---------- */
 async function pullAll(){
   if(!sb || !session) return;
@@ -872,12 +998,18 @@ function renderFilters(){
 
 function itemCardHTML(s){
   const links = Array.isArray(s.links) ? s.links : [];
-  return `<button class="item" data-id="${esc(s.id)}">
+  const today = todayStr();
+  const ended   = s.end_date && s.end_date < today;
+  const pending = s.start_date && s.start_date > today;
+  return `<button class="item ${ended?'ended':''}" data-id="${esc(s.id)}">
     <span class="bar" style="background:${catColor(s.category)}"></span>
     <span class="bd">
       <span class="ti">${esc(s.title)}</span>
       <span class="mt">
         <span class="tag time">${esc(whenLabel(s))}${s.time_text?' · '+esc(s.time_text):''}</span>
+        ${ended?`<span class="tag over">已結束 ${esc(fmtDate(s.end_date))}</span>`
+          :pending?`<span class="tag soon">${esc(fmtDate(s.start_date))} 起</span>`
+          :s.end_date?`<span class="tag">至 ${esc(fmtDate(s.end_date))}</span>`:''}
         ${s.category?`<span class="tag"><i class="cd" style="background:${catColor(s.category)}"></i>${esc(s.category)}</span>`:''}
         ${links.length?`<span class="tag lk">連結 ${links.length}</span>`:''}
       </span>
@@ -896,15 +1028,20 @@ function renderList(){
       ${state.filter?'換一個類別看看，或新增一筆。':'點右下角「新增排程」，建立每天／每週／每兩週／每月要做的事。'}</div>`;
     return;
   }
-  const order = {daily:0, weekly:1, biweekly:2, monthly:3};
+  const groupOf = s => s.freq === 'biweekly' ? 'custom' : s.freq;   // 舊資料歸到「自訂」
   let html = '';
   for(const f of FREQS){
-    const g = rows.filter(s=>s.freq===f.k).sort((a,b)=>{
-      if(f.k==='weekly'||f.k==='biweekly'){
+    const g = rows.filter(s=>groupOf(s)===f.k).sort((a,b)=>{
+      if(f.k==='weekly'){
         const d = (Number(a.weekday)||0)-(Number(b.weekday)||0); if(d) return d;
       }
       if(f.k==='monthly'){
         const d = (Number(a.month_day)||0)-(Number(b.month_day)||0); if(d) return d;
+      }
+      if(f.k==='custom'){
+        const u = {day:0,week:1,month:2};
+        const d = (u[a.custom_unit||'week']??1)-(u[b.custom_unit||'week']??1); if(d) return d;
+        const i = (Number(a.interval_n)||2)-(Number(b.interval_n)||2); if(i) return i;
       }
       const ta=(a.time_text||''), tb=(b.time_text||'');
       if(ta!==tb){ if(!ta) return 1; if(!tb) return -1; return ta.localeCompare(tb); }
@@ -921,7 +1058,6 @@ function renderList(){
     const s = state.schedules.find(x=>x.id===b.dataset.id);
     if(s) openDetail({kind:'schedule', row:s, mode:'edit'});
   });
-  void order;
 }
 
 /* ============================================================
@@ -943,12 +1079,20 @@ function renderCal(){
     const dots = items.slice(0,8).map(it=>{
       const done = isDone(it.row.id, ds);
       const col = catColor(it.row.category);
-      return `<i class="${done?'done':''}" style="${done?`color:${col}`:`background:${col}`}"></i>`;
+      const ev = it.kind === 'event' ? ' evt' : '';
+      return `<i class="${done?'done':''}${ev}" style="${done?`color:${col}`:`background:${col}`}"></i>`;
     }).join('');
     const chips = items.slice(0,3).map(it=>{
       const done = isDone(it.row.id, ds);
+      const col = catColor(it.row.category);
       const t = (it.row.time_text?it.row.time_text+' ':'') + it.row.title;
-      return `<span class="cchip ${done?'done':''}" style="border-left-color:${catColor(it.row.category)}">${esc(t)}</span>`;
+      if(it.kind !== 'event'){
+        return `<span class="cchip ${done?'done':''}" style="border-left-color:${col}">${esc(t)}</span>`;
+      }
+      const cont = it.span > 1 ? ` ${it.first?'st':''}${it.last?'en':''}${!it.first&&!it.last?'mid':''}` : '';
+      const style = `--c:${col};--c-soft:${hexRgba(col,.15)};--c-line:${hexRgba(col,.42)}`;
+      return `<span class="cchip evt${cont} ${done?'done':''}" style="${style}">${
+        it.span>1 && !it.first ? '<b class="cnt">▸</b>' : ''}${esc(t)}</span>`;
     }).join('');
     const more = items.length>3 ? `<span class="cmore">+${items.length-3}</span>` : '';
     cells.push(`<button class="cell ${out?'out':''} ${ds===today?'today':''} ${ds===state.selDate?'sel':''}" data-d="${ds}">
@@ -987,7 +1131,13 @@ function renderDay(){
   }
   box.innerHTML = items.map(it=>{
     const r = it.row, dn = isDone(r.id, ds);
-    return `<div class="drow ${dn?'done':''}" data-id="${esc(r.id)}" data-k="${it.kind}">
+    const ev = it.kind === 'event';
+    const col = catColor(r.category);
+    const style = ev ? `--c:${col};--c-soft:${hexRgba(col,.13)};--c-line:${hexRgba(col,.4)}` : '';
+    const kindTag = ev
+      ? `<span class="tag ev">${it.span>1?`多日行程 第 ${it.dayIndex}/${it.span} 天`:'單一行程'}</span>`
+      : `<span class="tag">${esc(whenLabel(r))}</span>`;
+    return `<div class="drow ${ev?'evt':''} ${dn?'done':''}" data-id="${esc(r.id)}" data-k="${it.kind}" style="${style}">
       <button class="ck ${dn?'on':''}" data-act="ck" aria-label="標記完成">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>
       </button>
@@ -995,8 +1145,8 @@ function renderDay(){
         <span class="dt">${esc(r.title)}</span>
         <span class="dsub">
           ${r.time_text?`<span class="tag time">${esc(r.time_text)}</span>`:''}
-          <span class="tag">${it.kind==='event'?'單一行程':esc(whenLabel(r))}</span>
-          ${r.category?`<span class="tag"><i class="cd" style="background:${catColor(r.category)}"></i>${esc(r.category)}</span>`:''}
+          ${kindTag}
+          ${r.category?`<span class="tag"><i class="cd" style="background:${col}"></i>${esc(r.category)}</span>`:''}
         </span>
       </button>
     </div>`;
@@ -1058,14 +1208,20 @@ function modal({title, body, footer, onClose}){
    ============================================================ */
 function openDetail({kind, row, mode, date}){
   const links = Array.isArray(row.links) ? row.links : [];
-  const when = kind==='event'
-    ? `${fmtDate(row.date)}（週${WD[parseYmd(row.date).getDay()]}）`
-    : whenLabel(row);
+  const isEvt = kind === 'event';
+  const when = isEvt ? eventWhenLabel(row) : whenLabel(row);
+  const col = catColor(row.category);
+  const evStyle = `--c:${col};--c-soft:${hexRgba(col,.13)};--c-line:${hexRgba(col,.4)}`;
+  const span = isEvt ? eventSpan(row) : 0;
+  const rl = isEvt ? '' : rangeLabel(row);
 
   let body = `<div class="dv-badges">
     <span class="tag time">${esc(when)}${row.time_text?' · '+esc(row.time_text):''}</span>
-    ${row.category?`<span class="tag"><i class="cd" style="background:${catColor(row.category)}"></i>${esc(row.category)}</span>`:''}
-    <span class="tag">${kind==='event'?'單一行程':'重複排程'}</span>
+    ${rl?`<span class="tag">${esc(rl)}</span>`:''}
+    ${row.category?`<span class="tag"><i class="cd" style="background:${col}"></i>${esc(row.category)}</span>`:''}
+    ${isEvt
+      ? `<span class="tag ev" style="${evStyle}">${span>1?`多日行程 · ${span} 天`:'單一行程'}</span>`
+      : `<span class="tag">重複排程</span>`}
   </div>`;
 
   if(mode==='calendar'){
@@ -1206,31 +1362,52 @@ function showFormErr(root, msg){
    排程表單（頁面一）
    ============================================================ */
 function openScheduleForm(existing){
+  const today = todayStr();
+  // 舊資料相容：每兩週 → 自訂「每 2 週」
+  const legacy2w = existing && existing.freq === 'biweekly';
   const s = existing || {
     id:uid(), title:'', description:'', freq:'weekly',
     weekday:new Date().getDay(), month_day:new Date().getDate(),
-    anchor_date:null, time_text:'', category:'', links:[]
+    start_date:today, end_date:null, interval_n:2, custom_unit:'week',
+    time_text:'', category:'', links:[]
   };
+  // 既有排程沒填起始日時，用建立日期回填，才不會把過去的紀錄藏起來
+  const startInit = s.start_date || s.anchor_date
+    || (s.created_at ? String(s.created_at).slice(0,10) : today);
   const body = `
     <div id="f-err" class="err hide"></div>
     <div class="fld"><label for="f-title">標題 <span style="color:var(--hot)">*</span></label>
       <input id="f-title" class="inp" value="${esc(s.title)}" placeholder="例：CR 教學會議" maxlength="120"></div>
     <div class="fld"><label>重複頻率</label>
       <div class="seg" id="f-freq">
-        ${FREQS.map(f=>`<button type="button" data-f="${f.k}" class="${s.freq===f.k?'on':''}">${f.label}</button>`).join('')}
+        ${FREQS.map(f=>`<button type="button" data-f="${f.k}" class="${(legacy2w?'custom':s.freq)===f.k?'on':''}">${f.label}</button>`).join('')}
       </div></div>
+    <div class="fld hide" id="w-custom"><label>間隔</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-size:14px;color:var(--ink2);flex:none">每</span>
+        <select id="f-int" class="inp" style="flex:0 0 84px">
+          ${Array.from({length:12},(_,i)=>i+1).map(n=>`<option value="${n}" ${Number(legacy2w?2:s.interval_n||2)===n?'selected':''}>${n}</option>`).join('')}
+        </select>
+        <select id="f-unit" class="inp" style="flex:1">
+          ${UNITS.map(u=>`<option value="${u.k}" ${(legacy2w?'week':(s.custom_unit||'week'))===u.k?'selected':''}>${u.label}</option>`).join('')}
+        </select>
+      </div>
+      <p class="hint">從「起始日」起算。例如每 2 週、每 3 個月。</p></div>
     <div class="fld hide" id="w-week"><label>星期幾</label>
       <div class="wk" id="f-wd">
         ${WD.map((w,i)=>`<button type="button" data-w="${i}" class="${(i===0||i===6)?'we':''} ${Number(s.weekday)===i?'on':''}">${w}</button>`).join('')}
       </div></div>
-    <div class="fld hide" id="w-anchor"><label for="f-anchor">起算日（決定是「這一週」還是「下一週」）</label>
-      <input id="f-anchor" class="inp" type="date" value="${esc(s.anchor_date||'')}">
-      <p class="hint">從這天起，每隔 14 天出現一次。</p></div>
-    <div class="fld hide" id="w-month"><label for="f-md">每月幾號</label>
+    <div class="fld hide" id="w-month"><label for="f-md">幾號</label>
       <select id="f-md" class="inp">
         ${Array.from({length:31},(_,i)=>i+1).map(n=>`<option value="${n}" ${Number(s.month_day)===n?'selected':''}>${n} 號</option>`).join('')}
       </select>
       <p class="hint">若當月沒有這一天（例如 31 號遇到小月），會落在該月最後一天。</p></div>
+    <div class="fld"><label for="f-start">起始日 <span style="color:var(--hot)">*</span></label>
+      <input id="f-start" class="inp" type="date" value="${esc(startInit)}">
+      <p class="hint">這天以前不會出現。</p></div>
+    <div class="fld"><label for="f-end">結束日（選填）</label>
+      <input id="f-end" class="inp" type="date" value="${esc(s.end_date||'')}">
+      <p class="hint">留空表示持續進行，不會結束。</p></div>
     <div class="fld"><label for="f-time">時間（選填）</label>
       <input id="f-time" class="inp" value="${esc(s.time_text||'')}" placeholder="例：08:00、晨會後" maxlength="40"></div>
     <div class="fld"><label for="f-cat">類別</label>${catSelectHTML(s.category)}</div>
@@ -1243,26 +1420,22 @@ function openScheduleForm(existing){
   const m = modal({ title: existing?'編輯排程':'新增重複排程', body, footer });
   const R = m.ov;
 
-  let freq = s.freq;
+  let freq = legacy2w ? 'custom' : s.freq;
   let weekday = Number(s.weekday) || 0;
 
+  const unitNow = () => $('#f-unit', R).value;
   function syncFreqUI(){
     $$('#f-freq button', R).forEach(b=>b.classList.toggle('on', b.dataset.f===freq));
-    $('#w-week', R).classList.toggle('hide', !(freq==='weekly'||freq==='biweekly'));
-    $('#w-anchor', R).classList.toggle('hide', freq!=='biweekly');
-    $('#w-month', R).classList.toggle('hide', freq!=='monthly');
-    if(freq==='biweekly' && !$('#f-anchor',R).value) $('#f-anchor',R).value = nextWeekdayFrom(todayStr(), weekday);
-  }
-  function nextWeekdayFrom(from, wd){
-    const d = parseYmd(from);
-    const delta = (wd - d.getDay() + 7) % 7;
-    return addDays(from, delta);
+    const cu = freq === 'custom' ? unitNow() : null;
+    $('#w-custom', R).classList.toggle('hide', freq !== 'custom');
+    $('#w-week',   R).classList.toggle('hide', !(freq==='weekly' || cu==='week'));
+    $('#w-month',  R).classList.toggle('hide', !(freq==='monthly' || cu==='month'));
   }
   $$('#f-freq button', R).forEach(b=>b.onclick = ()=>{ freq = b.dataset.f; syncFreqUI(); });
+  $('#f-unit', R).onchange = syncFreqUI;
   $$('#f-wd button', R).forEach(b=>b.onclick = ()=>{
     weekday = Number(b.dataset.w);
     $$('#f-wd button', R).forEach(x=>x.classList.toggle('on', x===b));
-    if(freq==='biweekly') $('#f-anchor',R).value = nextWeekdayFrom(todayStr(), weekday);
   });
   syncFreqUI();
   wireLinks(R); wireCat(R);
@@ -1272,24 +1445,29 @@ function openScheduleForm(existing){
   $('[data-save]', R).onclick = ()=>{
     const title = $('#f-title', R).value.trim();
     if(!title){ showFormErr(R, '請填寫標題。'); $('#f-title',R).focus(); return; }
-    let anchor = null;
-    if(freq==='biweekly'){
-      anchor = $('#f-anchor', R).value || nextWeekdayFrom(todayStr(), weekday);
-      const ad = parseYmd(anchor);
-      if(ad.getDay() !== weekday) anchor = nextWeekdayFrom(anchor, weekday);
-    }
+    const start = $('#f-start', R).value;
+    const end   = $('#f-end', R).value || null;
+    if(!start){ showFormErr(R, '請選擇起始日。'); $('#f-start',R).focus(); return; }
+    if(end && end < start){ showFormErr(R, '結束日不能早於起始日。'); $('#f-end',R).focus(); return; }
+
+    const unit = freq==='custom' ? unitNow() : null;
+    const useWd = freq==='weekly' || unit==='week';
+    const useMd = freq==='monthly' || unit==='month';
     const row = {
       id: s.id,
       title,
       description: $('#f-desc', R).value.trim(),
       freq,
-      weekday: (freq==='weekly'||freq==='biweekly') ? weekday : null,
-      month_day: freq==='monthly' ? Number($('#f-md', R).value) : null,
-      anchor_date: anchor,
+      weekday:   useWd ? weekday : null,
+      month_day: useMd ? Number($('#f-md', R).value) : null,
+      interval_n:  freq==='custom' ? Number($('#f-int', R).value) : null,
+      custom_unit: freq==='custom' ? unit : null,
+      anchor_date: null,
+      start_date: start,
+      end_date: end,
       time_text: $('#f-time', R).value.trim(),
       category: ($('#f-cat', R).value === '__new__' ? '' : $('#f-cat', R).value),
-      links: readLinks(R),
-      start_date: s.start_date || null
+      links: readLinks(R)
     };
     saveSchedule(row);
     m.close(); render();
@@ -1303,7 +1481,7 @@ function openScheduleForm(existing){
 function openEventForm(existing, presetDate){
   const e = existing || {
     id:uid(), title:'', description:'', date: presetDate || state.selDate,
-    time_text:'', category:'', links:[]
+    end_date:null, time_text:'', category:'', links:[]
   };
   const body = `
     <div id="f-err" class="err hide"></div>
@@ -1311,6 +1489,9 @@ function openEventForm(existing, presetDate){
       <input id="f-title" class="inp" value="${esc(e.title)}" placeholder="例：科部演講" maxlength="120"></div>
     <div class="fld"><label for="f-date">日期 <span style="color:var(--hot)">*</span></label>
       <input id="f-date" class="inp" type="date" value="${esc(e.date)}"></div>
+    <div class="fld"><label for="f-edate">結束日期（選填）</label>
+      <input id="f-edate" class="inp" type="date" value="${esc(e.end_date&&e.end_date>e.date?e.end_date:'')}">
+      <p class="hint" id="f-span">跨多日的活動才需要填，例如 8/1–8/3 的研討會。</p></div>
     <div class="fld"><label for="f-time">時間（選填）</label>
       <input id="f-time" class="inp" value="${esc(e.time_text||'')}" placeholder="例：14:00" maxlength="40"></div>
     <div class="fld"><label for="f-cat">類別</label>${catSelectHTML(e.category)}</div>
@@ -1325,14 +1506,28 @@ function openEventForm(existing, presetDate){
   wireLinks(R); wireCat(R);
   setTimeout(()=>{ if(!existing) $('#f-title', R).focus(); }, 60);
 
+  const showSpan = ()=>{
+    const a = $('#f-date', R).value, b = $('#f-edate', R).value;
+    const el = $('#f-span', R);
+    if(a && b && b > a) el.textContent = `共 ${diffDays(b,a)+1} 天，月曆上這幾天都會出現。`;
+    else if(a && b && b < a) el.textContent = '結束日期不能早於開始日期。';
+    else el.textContent = '跨多日的活動才需要填，例如 8/1–8/3 的研討會。';
+  };
+  $('#f-date', R).onchange = showSpan;
+  $('#f-edate', R).onchange = showSpan;
+  showSpan();
+
   $('[data-cancel]', R).onclick = m.close;
   $('[data-save]', R).onclick = ()=>{
     const title = $('#f-title', R).value.trim();
     const date  = $('#f-date', R).value;
+    const edate = $('#f-edate', R).value || null;
     if(!title){ showFormErr(R, '請填寫標題。'); return; }
     if(!date){  showFormErr(R, '請選擇日期。'); return; }
+    if(edate && edate < date){ showFormErr(R, '結束日期不能早於開始日期。'); return; }
     const row = {
       id: e.id, title, date,
+      end_date: (edate && edate > date) ? edate : null,
       description: $('#f-desc', R).value.trim(),
       time_text: $('#f-time', R).value.trim(),
       category: ($('#f-cat', R).value === '__new__' ? '' : $('#f-cat', R).value),
@@ -1422,19 +1617,29 @@ function normLinks(v){
   return Array.isArray(v) ? v.filter(l=>l && l.url)
     .map(l=>({ name:String(l.name||l.url), url:normUrl(l.url) })) : [];
 }
+const isYmd = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v||''));
 function normSchedule(s){
-  const freq = ['daily','weekly','biweekly','monthly'].includes(s.freq) ? s.freq : null;
+  const freq = ['daily','weekly','biweekly','monthly','custom'].includes(s.freq) ? s.freq : null;
   const title = String(s.title||'').trim();
   if(!title || !freq) return null;
+  const unit = freq==='custom' ? (['day','week','month'].includes(s.custom_unit) ? s.custom_unit : 'week') : null;
+  const useWd = freq==='weekly' || freq==='biweekly' || unit==='week';
+  const useMd = freq==='monthly' || unit==='month';
+  const start = isYmd(s.start_date) ? s.start_date
+              : (isYmd(s.anchor_date) ? s.anchor_date : todayStr());
+  const end = isYmd(s.end_date) && s.end_date >= start ? s.end_date : null;
   return {
     id: s.id || uid(),
     title,
     description: String(s.description||''),
     freq,
-    weekday:   (freq==='weekly'||freq==='biweekly') ? (Number(s.weekday)||0) : null,
-    month_day: freq==='monthly' ? Math.min(31, Math.max(1, Number(s.month_day)||1)) : null,
+    weekday:   useWd ? (Number(s.weekday)||0) : null,
+    month_day: useMd ? Math.min(31, Math.max(1, Number(s.month_day)||1)) : null,
+    interval_n:  freq==='custom' ? Math.max(1, Number(s.interval_n)||1) : null,
+    custom_unit: unit,
     anchor_date: freq==='biweekly' ? (s.anchor_date || null) : null,
-    start_date: s.start_date || null,
+    start_date: start,
+    end_date: end,
     time_text: String(s.time_text||''),
     category: String(s.category||''),
     links: normLinks(s.links)
@@ -1442,9 +1647,10 @@ function normSchedule(s){
 }
 function normEvent(e){
   const title = String(e.title||'').trim();
-  if(!title || !/^\d{4}-\d{2}-\d{2}$/.test(String(e.date||''))) return null;
+  if(!title || !isYmd(e.date)) return null;
   return {
     id: e.id || uid(), title, date: e.date,
+    end_date: (isYmd(e.end_date) && e.end_date > e.date) ? e.end_date : null,
     description: String(e.description||''),
     time_text: String(e.time_text||''),
     category: String(e.category||''),
@@ -1719,6 +1925,7 @@ async function startApp(){
 
   await flushQueue();   // 先把離線期間的變更送上去，再拉回伺服器版本
   await pullAll();
+  await checkSchema();
 
   // 首次使用：建立預設類別
   if(state.loaded && !state.categories.length && !state.schedules.length){

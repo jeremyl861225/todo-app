@@ -22,15 +22,20 @@ create table if not exists public.schedules (
   user_id     uuid not null references auth.users(id) on delete cascade,
   title       text not null,
   description text default '',
-  freq        text not null check (freq in ('daily','weekly','biweekly','monthly')),
-  weekday     int,          -- 0=週日 … 6=週六（每週／每兩週用）
-  month_day   int,          -- 1..31（每月用）
-  anchor_date date,         -- 每兩週的起算日
-  start_date  date,         -- 保留：從哪天開始生效
+  freq        text not null check (freq in ('daily','weekly','biweekly','monthly','custom')),
+  weekday     int,          -- 0=週日 … 6=週六（每週／自訂「每 N 週」用）
+  month_day   int,          -- 1..31（每月／自訂「每 N 個月」用）
+  interval_n  int,          -- 自訂：間隔數 N
+  custom_unit text check (custom_unit is null or custom_unit in ('day','week','month')),
+  anchor_date date,         -- 舊資料的每兩週起算日，新資料一律用 start_date
+  start_date  date,         -- 起始日（程式端必填，這天以前不出現）
+  end_date    date,         -- 結束日（選填，null = 持續進行）
   time_text   text default '',
   category    text default '',
   links       jsonb not null default '[]'::jsonb,
-  created_at  timestamptz not null default now()
+  created_at  timestamptz not null default now(),
+  constraint schedules_range_check
+    check (end_date is null or start_date is null or end_date >= start_date)
 );
 
 -- ---------- 單一行程（頁面二）----------
@@ -39,11 +44,13 @@ create table if not exists public.events (
   user_id     uuid not null references auth.users(id) on delete cascade,
   title       text not null,
   description text default '',
-  date        date not null,
+  date        date not null,   -- 開始日
+  end_date    date,            -- 結束日（選填，null = 單日；跨多日活動用）
   time_text   text default '',
   category    text default '',
   links       jsonb not null default '[]'::jsonb,
-  created_at  timestamptz not null default now()
+  created_at  timestamptz not null default now(),
+  constraint events_range_check check (end_date is null or end_date >= date)
 );
 
 -- ---------- 完成紀錄（某項目在某一天被勾選）----------
@@ -61,6 +68,7 @@ create index if not exists completions_lookup
   on public.completions (user_id, occur_date);
 create index if not exists schedules_user on public.schedules (user_id);
 create index if not exists events_user_date on public.events (user_id, date);
+create index if not exists events_user_range on public.events (user_id, date, end_date);
 
 -- =============================================================
 --  Row Level Security：每個人只看得到自己的資料
