@@ -7,10 +7,22 @@
 
 ---
 
-## 為什麼需要設定
+## ✅ 目前狀態（2026-08-01）
 
-「手機和電腦同步」必須有一台伺服器存放資料。這個 App 用 **Supabase** 免費方案，
-提供 Email + 密碼登入與資料庫。整個設定約 5 分鐘，只需做一次。
+**已經可以直接使用**：<https://jeremyl861225.github.io/todo-app/>
+
+已完成：Supabase 專案 `dawcpdgonxmhojwonkut` 建立、四張資料表與 RLS 建好、
+金鑰已填進 `index.html`、部署到 GitHub Pages。
+
+還沒做的兩件事：
+
+1. **註冊帳號**。第一次開網頁點「註冊」，用你的 Email 和一組密碼建立帳號。
+   目前 Supabase 的 **Confirm email 仍是開啟的**，所以註冊後要去信箱點確認信才能登入。
+   想省掉這一步，到 Supabase → Authentication → Sign In / Providers → Email →
+   把 **Confirm email** 關掉並 Save（詳見下面步驟三）。
+2. **換掉暫用 icon**（見文末「換 icon」）。
+
+以下步驟是**重新部署一份**或日後要自己重建時才需要看的紀錄。
 
 ---
 
@@ -85,6 +97,9 @@ const CONFIG = {
 > **不建立任何快取**，因此不會影響到 Clinical-Tools 或題庫 App 的離線快取。
 
 ## 步驟六：加到手機主畫面
+
+> 目前的網址：**<https://jeremyl861225.github.io/todo-app/>**
+
 
 **iPhone（Safari）**
 1. 用 Safari 開上面的網址（Chrome 不行，iOS 只有 Safari 能加入主畫面）。
