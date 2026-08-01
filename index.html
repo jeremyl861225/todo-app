@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F3EDE0">
+<meta name="color-scheme" content="light">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="待辦">
+<title>待辦事項</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.111.0/dist/umd/supabase.min.js"></script>
+<style>
+:root{
+  --bg:#F3EDE0; --bg2:#EAE2D1; --card:#FFFCF6; --card2:#FBF6EB;
+  --line:#E2D8C4; --line-soft:#EFE7D8;
+  --ink:#2E2A23; --ink2:#5F594C; --muted:#978E7E;
+  --accent:#4E6B57; --accent-ink:#3C5344; --accent-soft:#E4EDE5;
+  --hot:#B0603A; --hot-soft:#F6E7DE;
+  --danger:#A9483C;
+  --r-lg:16px; --r-md:12px; --r-sm:9px;
+  --sh-1:0 1px 2px rgba(78,64,40,.07);
+  --sh-2:0 2px 4px rgba(78,64,40,.06), 0 10px 28px rgba(78,64,40,.09);
+  --sh-3:0 18px 60px rgba(60,48,28,.22);
+  --nav-h:62px;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--bg); color:var(--ink); font-family:var(--font);
+  font-size:15px; line-height:1.55; letter-spacing:.01em;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh; overflow-x:hidden;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+a{color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.hide{display:none !important}
+
+/* ---------- shell ---------- */
+.wrap{max-width:1120px;margin:0 auto;padding:0 16px}
+header.top{
+  position:sticky; top:0; z-index:40;
+  background:rgba(243,237,224,.9); backdrop-filter:saturate(1.4) blur(10px);
+  border-bottom:1px solid var(--line-soft);
+  padding-top:env(safe-area-inset-top);
+}
+.top-in{display:flex;align-items:center;gap:12px;min-height:56px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.02em;font-size:16px;white-space:nowrap}
+.brand .mk{width:22px;height:22px;flex:none}
+.top-sp{flex:1}
+.pill{
+  display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;
+  border-radius:999px;background:var(--card);border:1px solid var(--line);
+  font-size:12px;color:var(--ink2);white-space:nowrap;
+}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none}
+.pill.warn{background:var(--hot-soft);border-color:#EBD3C4;color:#7E432A}
+.pill.warn .dot{background:var(--hot)}
+.iconbtn{
+  width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+  border:1px solid var(--line);background:var(--card);color:var(--ink2);
+  transition:background .15s,border-color .15s;flex:none;
+}
+.iconbtn:hover{background:var(--card2);border-color:#D6CAB2}
+
+/* nav */
+.nav{
+  display:flex;gap:4px;background:var(--bg2);border:1px solid var(--line-soft);
+  border-radius:999px;padding:4px;
+}
+.nav button{
+  flex:1;height:34px;padding:0 18px;border-radius:999px;font-size:14px;font-weight:600;
+  color:var(--ink2);display:flex;align-items:center;justify-content:center;gap:7px;
+  transition:background .18s,color .18s,box-shadow .18s;white-space:nowrap;
+}
+.nav button.on{background:var(--card);color:var(--accent-ink);box-shadow:var(--sh-1)}
+.nav svg{width:17px;height:17px;flex:none}
+
+main{padding:20px 0 40px}
+.page-head{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin:0 0 16px}
+.page-head h1{margin:0;font-size:21px;letter-spacing:.02em}
+.page-head p{margin:0;color:var(--muted);font-size:13px;flex:1;min-width:140px}
+
+/* ---------- cards / list ---------- */
+.group{margin:0 0 22px}
+.group-h{display:flex;align-items:center;gap:10px;margin:0 0 9px;padding:0 2px}
+.group-h .t{font-size:13.5px;font-weight:700;letter-spacing:.06em;color:var(--ink2)}
+.group-h .n{font-size:11.5px;color:var(--muted);background:var(--bg2);border-radius:999px;padding:1px 8px}
+.group-h .ln{flex:1;height:1px;background:var(--line-soft)}
+
+.cards{display:grid;gap:9px}
+@media(min-width:760px){.cards{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1000px){.cards{grid-template-columns:repeat(3,1fr)}}
+
+.item{
+  width:100%;text-align:left;background:var(--card);border:1px solid var(--line);
+  border-radius:var(--r-md);padding:12px 13px;display:flex;gap:11px;align-items:flex-start;
+  box-shadow:var(--sh-1);transition:transform .12s,box-shadow .18s,border-color .18s;
+  min-width:0;
+}
+.item:hover{box-shadow:var(--sh-2);border-color:#D6CAB2;transform:translateY(-1px)}
+.item:active{transform:translateY(0)}
+.item .bar{width:3px;align-self:stretch;border-radius:3px;background:var(--accent);flex:none;min-height:34px}
+.item .bd{flex:1;min-width:0;display:block}
+.item .ti{display:block;font-weight:600;font-size:14.5px;line-height:1.4;word-break:break-word}
+.item .mt{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:5px}
+.item .desc{color:var(--muted);font-size:12.5px;margin-top:5px;overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+
+.tag{
+  display:inline-flex;align-items:center;gap:5px;font-size:11.5px;line-height:1;
+  padding:4px 8px;border-radius:999px;background:var(--bg2);color:var(--ink2);white-space:nowrap;
+}
+.tag.time{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+.tag .cd{width:7px;height:7px;border-radius:50%;flex:none}
+.tag.lk{background:#EFEAF0;color:#5B4B62}
+
+.empty{
+  text-align:center;color:var(--muted);font-size:13.5px;padding:38px 20px;
+  border:1px dashed var(--line);border-radius:var(--r-lg);background:var(--card2);
+}
+.empty b{display:block;color:var(--ink2);font-size:15px;margin-bottom:5px;font-weight:600}
+
+/* filter row */
+.filters{display:flex;gap:7px;overflow-x:auto;padding:2px 2px 10px;margin:0 0 6px;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.filters::-webkit-scrollbar{display:none}
+.chip{
+  border:1px solid var(--line);background:var(--card);border-radius:999px;
+  padding:5px 12px;font-size:12.5px;color:var(--ink2);white-space:nowrap;flex:none;
+  display:inline-flex;align-items:center;gap:6px;transition:background .15s,border-color .15s;
+}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip.on .cd{box-shadow:0 0 0 1.5px rgba(255,255,255,.7)}
+
+/* ---------- calendar ---------- */
+.cal-layout{display:grid;gap:16px}
+@media(min-width:940px){.cal-layout{grid-template-columns:minmax(0,1fr) 330px;align-items:start}}
+
+.calbar{display:flex;align-items:center;gap:8px;margin:0 0 12px}
+.calbar .mo{font-size:18px;font-weight:700;letter-spacing:.02em;min-width:120px}
+.calbar .sp{flex:1}
+.tbtn{border:1px solid var(--line);background:var(--card);border-radius:999px;
+  height:31px;padding:0 13px;font-size:13px;color:var(--ink2);box-shadow:var(--sh-1)}
+.tbtn:hover{background:var(--card2)}
+
+.cal{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--sh-1);overflow:hidden}
+.cal .dow{display:grid;grid-template-columns:repeat(7,1fr);background:var(--card2);
+  border-bottom:1px solid var(--line-soft)}
+.cal .dow span{text-align:center;font-size:11.5px;color:var(--muted);padding:8px 0;font-weight:600;letter-spacing:.05em}
+.cal .dow span.we{color:var(--hot)}
+.cal .grid{display:grid;grid-template-columns:repeat(7,1fr)}
+.cell{
+  position:relative;border-right:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);
+  min-height:56px;padding:5px 4px 4px;text-align:left;display:flex;flex-direction:column;gap:3px;
+  background:var(--card);transition:background .14s;min-width:0;overflow:hidden;
+}
+.cell:nth-child(7n){border-right:none}
+.cell.out{background:var(--card2);opacity:.55}
+.cell:hover{background:var(--card2)}
+.cell .dn{font-size:12.5px;font-weight:600;color:var(--ink2);width:22px;height:22px;
+  display:grid;place-items:center;border-radius:50%;flex:none}
+.cell.today .dn{background:var(--hot);color:#fff}
+.cell.sel{background:var(--accent-soft)}
+.cell.sel::after{content:"";position:absolute;inset:0;border:2px solid var(--accent);
+  border-radius:2px;pointer-events:none}
+.dots{display:flex;flex-wrap:wrap;gap:3px;padding:0 1px}
+.dots i{width:6px;height:6px;border-radius:50%;display:block}
+.dots i.done{box-shadow:inset 0 0 0 1px currentColor;background:transparent !important;opacity:.45}
+.cchips{display:none;flex-direction:column;gap:2px;min-width:0}
+.cchip{font-size:11px;line-height:1.35;padding:2px 5px;border-radius:5px;background:var(--bg2);
+  color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  border-left:2.5px solid var(--accent)}
+.cchip.done{opacity:.45;text-decoration:line-through}
+.cmore{font-size:10.5px;color:var(--muted);padding-left:5px}
+@media(min-width:940px){
+  .cell{min-height:104px;padding:6px 5px 5px}
+  .dots{display:none}
+  .cchips{display:flex}
+}
+
+/* day panel */
+.daypanel{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--sh-1);overflow:hidden}
+.daypanel .dh{padding:13px 15px;border-bottom:1px solid var(--line-soft);background:var(--card2);
+  display:flex;align-items:baseline;gap:9px}
+.daypanel .dh .d1{font-size:17px;font-weight:700}
+.daypanel .dh .d2{font-size:12.5px;color:var(--muted)}
+.daypanel .dh .sp{flex:1}
+.daypanel .dh .prog{font-size:12px;color:var(--accent-ink);font-weight:600}
+.dlist{padding:8px;display:flex;flex-direction:column;gap:6px;max-height:min(58vh,560px);overflow-y:auto}
+@media(min-width:940px){.dlist{max-height:calc(100vh - 240px)}}
+.drow{display:flex;align-items:flex-start;gap:9px;padding:9px 10px;border-radius:var(--r-sm);
+  border:1px solid var(--line-soft);background:var(--card);transition:background .14s}
+.drow:hover{background:var(--card2)}
+.drow.done{opacity:.6}
+.drow.done .dt{text-decoration:line-through}
+.ck{width:22px;height:22px;border-radius:7px;border:1.8px solid var(--line);background:var(--card);
+  flex:none;display:grid;place-items:center;margin-top:1px;transition:background .15s,border-color .15s}
+.ck:hover{border-color:var(--accent)}
+.ck.on{background:var(--accent);border-color:var(--accent)}
+.ck svg{width:13px;height:13px;color:#fff;opacity:0}
+.ck.on svg{opacity:1}
+.dmain{flex:1;min-width:0;text-align:left}
+.dt{display:block;font-size:14px;font-weight:600;line-height:1.4;word-break:break-word}
+.dsub{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+.dnone{color:var(--muted);font-size:13px;text-align:center;padding:26px 10px}
+
+/* ---------- FAB ---------- */
+.fab{
+  position:fixed;right:max(16px,env(safe-area-inset-right));
+  bottom:calc(var(--nav-h) + 18px + env(safe-area-inset-bottom));
+  z-index:45;height:50px;padding:0 20px 0 17px;border-radius:999px;
+  background:var(--accent);color:#fff;font-weight:600;font-size:14.5px;
+  display:flex;align-items:center;gap:8px;box-shadow:0 6px 20px rgba(48,72,56,.32);
+  transition:transform .14s,box-shadow .18s;
+}
+.fab:hover{transform:translateY(-1px);box-shadow:0 10px 26px rgba(48,72,56,.38)}
+.fab svg{width:18px;height:18px}
+@media(min-width:760px){.fab{bottom:26px;right:26px}}
+
+/* ---------- modal ---------- */
+.ov{position:fixed;inset:0;z-index:60;background:rgba(48,40,26,.42);
+  backdrop-filter:blur(3px);display:flex;align-items:flex-end;justify-content:center;
+  padding:0;animation:fade .16s ease}
+@media(min-width:640px){.ov{align-items:center;padding:24px}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes rise{from{transform:translateY(22px);opacity:.4}to{transform:none;opacity:1}}
+.sheet{
+  background:var(--card);width:100%;max-width:560px;border-radius:18px 18px 0 0;
+  box-shadow:var(--sh-3);display:flex;flex-direction:column;
+  max-height:92vh;max-height:92dvh;animation:rise .2s cubic-bezier(.2,.7,.3,1);overflow:hidden;
+}
+@media(min-width:640px){.sheet{border-radius:var(--r-lg);max-height:88vh}}
+.sh-h{display:flex;align-items:center;gap:10px;padding:15px 16px 12px;border-bottom:1px solid var(--line-soft);
+  background:var(--card2);flex:none}
+.sh-h h2{margin:0;font-size:16.5px;font-weight:700;flex:1;min-width:0;word-break:break-word;line-height:1.4}
+.sh-b{padding:16px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
+.sh-f{padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line-soft);
+  display:flex;gap:9px;background:var(--card2);flex:none}
+.sh-f .sp{flex:1}
+
+.btn{height:40px;padding:0 18px;border-radius:var(--r-sm);font-size:14.5px;font-weight:600;
+  border:1px solid var(--line);background:var(--card);color:var(--ink2);
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:background .15s,border-color .15s}
+.btn:hover{background:var(--bg2)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.pri:hover{background:var(--accent-ink)}
+.btn.dg{color:var(--danger);border-color:#E3CFC9;background:#FBF0EE}
+.btn.dg:hover{background:#F6E3DF}
+.btn.wide{width:100%}
+.btn svg{width:16px;height:16px}
+.btn:disabled{opacity:.5;pointer-events:none}
+
+/* form */
+.fld{margin:0 0 15px}
+.fld>label{display:block;font-size:12.5px;font-weight:600;color:var(--ink2);margin:0 0 6px;letter-spacing:.03em}
+.inp{width:100%;height:42px;padding:0 12px;border-radius:var(--r-sm);border:1px solid var(--line);
+  background:var(--card2);transition:border-color .15s,background .15s;font-size:15px}
+textarea.inp{height:auto;min-height:86px;padding:10px 12px;line-height:1.6;resize:vertical}
+.inp:focus{outline:none;border-color:var(--accent);background:var(--card)}
+select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23978E7E' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 11px center;background-size:16px;padding-right:34px}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.seg button{height:38px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--card2);
+  font-size:13.5px;font-weight:600;color:var(--ink2);transition:all .15s;padding:0 4px}
+.seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.wk{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.wk button{height:38px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--card2);
+  font-size:13.5px;font-weight:600;color:var(--ink2);transition:all .15s}
+.wk button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.wk button.we{color:var(--hot)}
+.wk button.we.on{color:#fff}
+.linkrow{display:flex;gap:6px;margin:0 0 6px;align-items:center}
+.linkrow .inp{height:38px;font-size:14px}
+.linkrow .n{flex:0 0 32%;min-width:0}
+.linkrow .u{flex:1;min-width:0}
+.xbtn{width:32px;height:32px;flex:none;border-radius:8px;display:grid;place-items:center;
+  color:var(--muted);border:1px solid transparent}
+.xbtn:hover{background:var(--hot-soft);color:var(--hot)}
+.addlink{font-size:13px;color:var(--accent-ink);font-weight:600;padding:5px 2px}
+.addlink:hover{text-decoration:underline}
+.hint{font-size:12px;color:var(--muted);margin:6px 0 0;line-height:1.5}
+.err{font-size:13px;color:var(--danger);background:#FBF0EE;border:1px solid #E9D5D0;
+  border-radius:var(--r-sm);padding:9px 11px;margin:0 0 14px}
+
+/* detail */
+.dv-badges{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 14px}
+.dv-sec{margin:0 0 16px}
+.dv-sec h3{margin:0 0 6px;font-size:11.5px;letter-spacing:.1em;color:var(--muted);font-weight:700}
+.dv-txt{white-space:pre-wrap;word-break:break-word;font-size:14.5px;line-height:1.7;color:var(--ink)}
+.dv-link{display:flex;align-items:center;gap:9px;padding:10px 12px;border:1px solid var(--line);
+  border-radius:var(--r-sm);background:var(--card2);margin:0 0 6px;text-decoration:none;color:var(--ink);
+  transition:background .15s,border-color .15s}
+.dv-link:hover{background:var(--accent-soft);border-color:#CBDCCE}
+.dv-link .lt{flex:1;min-width:0;display:block}
+.dv-link .l1{display:block;font-size:14px;font-weight:600;word-break:break-word}
+.dv-link .l2{display:block;font-size:11.5px;color:var(--muted);word-break:break-all;line-height:1.4;margin-top:1px}
+.dv-link svg{width:16px;height:16px;color:var(--muted);flex:none}
+.dv-check{display:flex;align-items:center;gap:11px;padding:13px;border-radius:var(--r-md);
+  border:1px solid var(--line);background:var(--card2);width:100%;text-align:left;transition:all .15s}
+.dv-check.on{background:var(--accent-soft);border-color:#C4D8C8}
+.dv-check .t{font-size:14.5px;font-weight:600}
+.dv-check .s{font-size:12px;color:var(--muted)}
+.dv-note{font-size:12px;color:var(--muted);text-align:center;padding:2px 0 0;line-height:1.5}
+
+/* auth */
+.authwrap{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px 18px}
+.authbox{width:100%;max-width:392px;background:var(--card);border:1px solid var(--line);
+  border-radius:var(--r-lg);box-shadow:var(--sh-2);padding:28px 24px calc(24px + env(safe-area-inset-bottom))}
+.authbox .lg{display:flex;flex-direction:column;align-items:center;gap:9px;margin:0 0 22px;text-align:center}
+.authbox .lg svg{width:46px;height:46px}
+.authbox .lg b{font-size:19px;letter-spacing:.03em}
+.authbox .lg span{font-size:13px;color:var(--muted)}
+.authtabs{display:flex;gap:4px;background:var(--bg2);border-radius:999px;padding:4px;margin:0 0 20px}
+.authtabs button{flex:1;height:34px;border-radius:999px;font-size:14px;font-weight:600;color:var(--ink2)}
+.authtabs button.on{background:var(--card);color:var(--accent-ink);box-shadow:var(--sh-1)}
+.ok{font-size:13px;color:var(--accent-ink);background:var(--accent-soft);border:1px solid #CDDCD0;
+  border-radius:var(--r-sm);padding:9px 11px;margin:0 0 14px;line-height:1.6}
+
+/* menu */
+.menu{position:absolute;right:16px;top:calc(56px + env(safe-area-inset-top));z-index:50;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);
+  box-shadow:var(--sh-2);padding:6px;min-width:212px}
+.menu .who{padding:8px 10px 10px;border-bottom:1px solid var(--line-soft);margin:0 0 6px}
+.menu .who b{display:block;font-size:13px;font-weight:600;word-break:break-all;line-height:1.4}
+.menu .who span{font-size:11.5px;color:var(--muted)}
+.menu button{display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:9px 10px;
+  border-radius:var(--r-sm);font-size:13.5px;color:var(--ink2)}
+.menu button:hover{background:var(--bg2)}
+.menu button.dg{color:var(--danger)}
+.menu svg{width:15px;height:15px;flex:none}
+
+/* toast */
+.toasts{position:fixed;left:50%;transform:translateX(-50%);z-index:90;
+  bottom:calc(var(--nav-h) + 84px + env(safe-area-inset-bottom));
+  display:flex;flex-direction:column;gap:8px;width:calc(100% - 32px);max-width:400px;pointer-events:none}
+@media(min-width:760px){.toasts{bottom:26px;left:26px;transform:none}}
+.toast{background:#33301F;color:#F6F1E4;font-size:13.5px;padding:11px 14px;border-radius:var(--r-sm);
+  box-shadow:var(--sh-2);animation:rise .2s ease;line-height:1.5}
+.toast.bad{background:#7C382C}
+
+/* setup screen */
+.setup{max-width:620px;margin:0 auto;padding:32px 18px 60px}
+.setup h1{font-size:21px;margin:0 0 6px}
+.setup p.lead{color:var(--ink2);font-size:14px;margin:0 0 22px;line-height:1.7}
+.setup ol{padding-left:20px;margin:0 0 22px;color:var(--ink2);font-size:14px;line-height:1.85}
+.setup code{background:var(--bg2);padding:2px 6px;border-radius:5px;font-size:12.5px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all}
+.setup .box{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:20px;box-shadow:var(--sh-1)}
+
+#nav-holder{padding-top:0;padding-bottom:10px}
+
+/* mobile nav */
+@media(max-width:759px){
+  #nav-holder{padding:0}
+  .page-head{flex-direction:column;align-items:flex-start;gap:3px}
+  .page-head p{min-width:0}
+  main{padding-bottom:124px !important}
+  .dlist{max-height:none}   /* 手機讓整頁一起捲，避免巢狀捲動 */
+  .nav{
+    position:fixed;left:0;right:0;bottom:0;z-index:44;border-radius:0;
+    background:rgba(255,252,246,.96);backdrop-filter:blur(10px);
+    border:none;border-top:1px solid var(--line);padding:7px 12px calc(7px + env(safe-area-inset-bottom));
+    gap:8px;box-shadow:0 -2px 14px rgba(78,64,40,.06);
+  }
+  .nav button{height:44px;flex-direction:row;font-size:13.5px}
+  .nav button.on{background:var(--accent-soft)}
+  body.app-on{padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom))}
+  .wrap{padding:0 13px}
+  .top-in{min-height:52px}
+  main{padding:16px 0 24px}
+}
+@media(min-width:760px){
+  #nav-holder{
+    display:flex; position:sticky; top:calc(56px + env(safe-area-inset-top)); z-index:39;
+    background:var(--bg); padding-top:10px;
+  }
+  .nav{flex:0 0 auto}
+  .nav button{flex:0 0 auto;padding:0 22px}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ SETUP ============ -->
+<section id="scr-setup" class="setup hide">
+  <h1>初次設定</h1>
+  <p class="lead">這個 App 用 <b>Supabase</b>（免費）做帳號與雲端同步。請依 <code>SETUP.md</code> 建立專案後，把兩個值填在下面（或直接寫進 index.html 最上方的 <code>CONFIG</code>，這樣所有裝置都不用再填）。</p>
+  <div class="box">
+    <div class="fld">
+      <label for="su-url">Project URL</label>
+      <input id="su-url" class="inp" placeholder="https://xxxxxxxx.supabase.co" autocapitalize="off" autocorrect="off" spellcheck="false">
+    </div>
+    <div class="fld">
+      <label for="su-key">anon public key</label>
+      <textarea id="su-key" class="inp" placeholder="eyJhbGciOi..." autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+    </div>
+    <div id="su-err" class="err hide"></div>
+    <button class="btn pri wide" id="su-save">儲存並繼續</button>
+  </div>
+</section>
+
+<!-- ============ AUTH ============ -->
+<section id="scr-auth" class="authwrap hide">
+  <div class="authbox">
+    <div class="lg">
+      <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+        <rect x="4" y="7" width="40" height="37" rx="8" fill="#4E6B57"/>
+        <rect x="4" y="7" width="40" height="10" rx="8" fill="#3C5344"/>
+        <rect x="13" y="3" width="4.5" height="9" rx="2.25" fill="#B0603A"/>
+        <rect x="30.5" y="3" width="4.5" height="9" rx="2.25" fill="#B0603A"/>
+        <path d="M16 30.5l5.2 5.2L33 24" stroke="#FFFCF6" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <b>待辦事項</b>
+      <span>重複排程與月曆，跨裝置同步</span>
+    </div>
+    <div class="authtabs">
+      <button id="tab-in" class="on">登入</button>
+      <button id="tab-up">註冊</button>
+    </div>
+    <div id="au-err" class="err hide"></div>
+    <div id="au-ok" class="ok hide"></div>
+    <form id="au-form" novalidate>
+      <div class="fld">
+        <label for="au-email">Email</label>
+        <input id="au-email" class="inp" type="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="you@example.com">
+      </div>
+      <div class="fld">
+        <label for="au-pw">密碼</label>
+        <input id="au-pw" class="inp" type="password" autocomplete="current-password" placeholder="至少 6 個字元">
+      </div>
+      <button class="btn pri wide" id="au-go" type="submit">登入</button>
+    </form>
+    <p class="hint" id="au-hint" style="text-align:center;margin-top:14px">登入狀態會記住，之後開啟不需重新登入。</p>
+  </div>
+</section>
+
+<!-- ============ APP ============ -->
+<div id="scr-app" class="hide">
+  <header class="top">
+    <div class="wrap top-in">
+      <div class="brand">
+        <svg class="mk" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <rect x="4" y="7" width="40" height="37" rx="8" fill="#4E6B57"/>
+          <rect x="4" y="7" width="40" height="10" rx="8" fill="#3C5344"/>
+          <rect x="13" y="3" width="4.5" height="9" rx="2.25" fill="#B0603A"/>
+          <rect x="30.5" y="3" width="4.5" height="9" rx="2.25" fill="#B0603A"/>
+          <path d="M16 30.5l5.2 5.2L33 24" stroke="#FFFCF6" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>待辦事項</span>
+      </div>
+      <div class="top-sp"></div>
+      <span class="pill" id="sync"><i class="dot"></i><span id="sync-t">已同步</span></span>
+      <button class="iconbtn" id="btn-menu" aria-label="選單">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="5" r="1.4" fill="currentColor" stroke="none"/>
+          <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/>
+          <circle cx="12" cy="19" r="1.4" fill="currentColor" stroke="none"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+    <div class="wrap" id="nav-holder">
+      <nav class="nav" id="nav">
+        <button data-p="list" class="on">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6.5l2 2 3.5-4"/><path d="M3.5 13l2 2 3.5-4"/><path d="M3.5 19.5l2 2 3.5-4"/><path d="M13 6h8M13 12.5h8M13 19h8"/></svg>
+          重複排程
+        </button>
+        <button data-p="cal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+          月曆
+        </button>
+      </nav>
+    </div>
+
+  <main>
+    <!-- PAGE 1 -->
+    <section id="p-list" class="wrap">
+      <div class="page-head">
+        <h1>重複排程</h1>
+        <p>每天、每週、每兩週、每月要完成的事。點擊查看細節，可新增／編輯／刪除。</p>
+      </div>
+      <div class="filters" id="fl-list"></div>
+      <div id="list-body"></div>
+    </section>
+
+    <!-- PAGE 2 -->
+    <section id="p-cal" class="wrap hide">
+      <div class="page-head">
+        <h1>月曆</h1>
+        <p>與重複排程同步，可勾選完成、加入單一行程；排程本身請至上一頁修改。</p>
+      </div>
+      <div class="calbar">
+        <button class="iconbtn" id="cal-prev" aria-label="上個月">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <div class="mo" id="cal-mo">—</div>
+        <button class="iconbtn" id="cal-next" aria-label="下個月">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <div class="sp"></div>
+        <button class="tbtn" id="cal-today">今天</button>
+      </div>
+      <div class="cal-layout">
+        <div class="cal">
+          <div class="dow"><span class="we">日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span class="we">六</span></div>
+          <div class="grid" id="cal-grid"></div>
+        </div>
+        <div class="daypanel">
+          <div class="dh">
+            <span class="d1" id="dp-d1">—</span>
+            <span class="d2" id="dp-d2"></span>
+            <span class="sp"></span>
+            <span class="prog" id="dp-prog"></span>
+          </div>
+          <div class="dlist" id="dp-list"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <button class="fab" id="fab">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    <span id="fab-t">新增排程</span>
+  </button>
+</div>
+
+<div class="toasts" id="toasts"></div>
+<div id="modal-root"></div>
+
+<script>
+/* ============================================================
+   設定：填入後所有裝置都不用再手動輸入
+   ============================================================ */
+const CONFIG = {
+  SUPABASE_URL: 'https://dawcpdgonxmhojwonkut.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_pjoI0uuRcCn16-GMC_g0xw_9nqoJU-V'
+};
+
+/* ---------- 常數 ---------- */
+const FREQS = [
+  {k:'daily',    label:'每天'},
+  {k:'weekly',   label:'每週'},
+  {k:'biweekly', label:'每兩週'},
+  {k:'monthly',  label:'每月'}
+];
+const FREQ_LABEL = Object.fromEntries(FREQS.map(f=>[f.k,f.label]));
+const WD = ['日','一','二','三','四','五','六'];
+const PALETTE = ['#4E6B57','#B0603A','#6A7FA0','#8A6A9C','#A8874A','#3F7F79','#9A5A64','#6E7B4A'];
+const DEFAULT_CATS = ['教學CR','臨床事務'];
+
+/* ---------- 工具 ---------- */
+const $  = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
+const pad = n => String(n).padStart(2,'0');
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID()
+  : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
+      const r=Math.random()*16|0; return (c==='x'?r:(r&0x3|0x8)).toString(16);}));
+
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parseYmd = s => { const [y,m,d] = String(s).split('-').map(Number); return new Date(y,m-1,d); };
+const todayStr = () => ymd(new Date());
+const daysInMonth = (y,m) => new Date(y,m+1,0).getDate();
+const diffDays = (a,b) => Math.round((parseYmd(a) - parseYmd(b))/86400000);
+const addDays = (s,n) => { const d=parseYmd(s); d.setDate(d.getDate()+n); return ymd(d); };
+const fmtDate = s => { const d=parseYmd(s); return `${d.getMonth()+1} 月 ${d.getDate()} 日`; };
+
+function catColor(name){
+  if(!name) return '#A79C88';
+  const c = state.categories.find(x=>x.name===name);
+  if(c && c.color) return c.color;
+  let h=0; for(const ch of name) h=(h*31+ch.charCodeAt(0))>>>0;
+  return PALETTE[h%PALETTE.length];
+}
+function normUrl(u){
+  u = String(u||'').trim();
+  if(!u) return '';
+  if(/^(https?:|mailto:|tel:)/i.test(u)) return u;
+  return 'https://' + u.replace(/^\/+/,'');
+}
+function safeHref(u){
+  const n = normUrl(u);
+  return /^(https?:|mailto:|tel:)/i.test(n) ? n : '#';
+}
+function toast(msg, bad){
+  const el = document.createElement('div');
+  el.className = 'toast' + (bad?' bad':'');
+  el.textContent = msg;
+  $('#toasts').appendChild(el);
+  setTimeout(()=>{ el.style.transition='opacity .3s'; el.style.opacity='0';
+    setTimeout(()=>el.remove(),320); }, bad?4200:2400);
+}
+
+/* ---------- 排程展開 ---------- */
+function occursOn(s, dateStr){
+  if(s.start_date && dateStr < s.start_date) return false;
+  const d = parseYmd(dateStr);
+  switch(s.freq){
+    case 'daily':    return true;
+    case 'weekly':   return d.getDay() === Number(s.weekday);
+    case 'biweekly': {
+      if(!s.anchor_date) return d.getDay() === Number(s.weekday);
+      return ((diffDays(dateStr, s.anchor_date) % 14) + 14) % 14 === 0;
+    }
+    case 'monthly': {
+      const dim = daysInMonth(d.getFullYear(), d.getMonth());
+      return d.getDate() === Math.min(Number(s.month_day)||1, dim);
+    }
+  }
+  return false;
+}
+function whenLabel(s){
+  switch(s.freq){
+    case 'daily':    return '每天';
+    case 'weekly':   return `每週${WD[Number(s.weekday)||0]}`;
+    case 'biweekly': return `每兩週${WD[Number(s.weekday)||0]}`;
+    case 'monthly':  return `每月 ${Number(s.month_day)||1} 號`;
+  }
+  return '';
+}
+/** 某日期的所有項目（排程 + 單一行程），已排序 */
+function itemsOn(dateStr){
+  const out = [];
+  for(const s of state.schedules) if(occursOn(s, dateStr)) out.push({kind:'schedule', row:s});
+  for(const e of state.events)    if(e.date === dateStr)   out.push({kind:'event', row:e});
+  const rank = {daily:0, weekly:1, biweekly:2, monthly:3};
+  out.sort((a,b)=>{
+    const ta=(a.row.time_text||'').trim(), tb=(b.row.time_text||'').trim();
+    if(ta && tb && ta!==tb) return ta.localeCompare(tb);
+    if(ta && !tb) return -1;
+    if(!ta && tb) return 1;
+    if(a.kind!==b.kind) return a.kind==='event' ? 1 : -1;
+    if(a.kind==='schedule') return (rank[a.row.freq]??9) - (rank[b.row.freq]??9);
+    return String(a.row.title).localeCompare(String(b.row.title));
+  });
+  return out;
+}
+const doneKey = (id, date) => id + '|' + date;
+function isDone(id, date){ return state.doneIndex.has(doneKey(id,date)); }
+function rebuildDoneIndex(){
+  state.doneIndex = new Map();
+  for(const c of state.completions) state.doneIndex.set(doneKey(c.item_id, c.occur_date), c);
+}
+
+/* ============================================================
+   狀態 + 儲存
+   ============================================================ */
+let sb = null;
+let session = null;
+const state = {
+  schedules:[], events:[], completions:[], categories:[],
+  doneIndex:new Map(),
+  page:'list', calY:0, calM:0, selDate: todayStr(),
+  filter:null, loaded:false, online:navigator.onLine
+};
+const queue = [];   // 待上傳操作
+let flushing = false;
+
+const cfgKey  = 'todo.cfg.v1';
+const cacheKey = () => 'todo.cache.' + (session?.user?.id || 'anon');
+const queueKey = () => 'todo.queue.' + (session?.user?.id || 'anon');
+
+function saveCache(){
+  if(!session) return;
+  try{
+    localStorage.setItem(cacheKey(), JSON.stringify({
+      t: Date.now(),
+      schedules: state.schedules, events: state.events,
+      completions: state.completions, categories: state.categories
+    }));
+  }catch(e){ /* quota */ }
+}
+function loadCache(){
+  try{
+    const raw = localStorage.getItem(cacheKey());
+    if(!raw) return false;
+    const d = JSON.parse(raw);
+    state.schedules  = d.schedules  || [];
+    state.events     = d.events     || [];
+    state.completions= d.completions|| [];
+    state.categories = d.categories || [];
+    rebuildDoneIndex();
+    return true;
+  }catch(e){ return false; }
+}
+function saveQueue(){
+  if(!session) return;
+  try{ localStorage.setItem(queueKey(), JSON.stringify(queue)); }catch(e){}
+}
+function loadQueue(){
+  try{
+    const raw = localStorage.getItem(queueKey());
+    if(raw){ const arr = JSON.parse(raw); if(Array.isArray(arr)) queue.push(...arr); }
+  }catch(e){}
+}
+
+function setSync(){
+  const el = $('#sync'), t = $('#sync-t');
+  if(!el) return;
+  if(queue.length){ el.className='pill warn'; t.textContent = `待上傳 ${queue.length}`; }
+  else if(!state.online){ el.className='pill warn'; t.textContent = '離線'; }
+  else if(flushing){ el.className='pill'; t.textContent = '同步中'; }
+  else { el.className='pill'; t.textContent = '已同步'; }
+}
+
+function enqueue(op){
+  queue.push(op);
+  saveQueue(); setSync();
+  flushQueue();
+}
+async function applyOp(op){
+  if(op.type === 'upsert'){
+    const { error } = await sb.from(op.table).upsert(op.row);
+    if(error) throw error;
+  }else if(op.type === 'delete'){
+    const { error } = await sb.from(op.table).delete().eq('id', op.id);
+    if(error) throw error;
+  }
+}
+async function flushQueue(){
+  if(flushing || !queue.length || !sb || !session) return;
+  flushing = true; setSync();
+  while(queue.length){
+    const op = queue[0];
+    try{
+      await applyOp(op);
+      queue.shift(); saveQueue();
+    }catch(err){
+      const msg = String(err?.message || err || '');
+      // 另一台裝置已經勾過同一天：視為成功，不用吵使用者
+      const dupCompletion = op.table === 'completions' && /duplicate|unique/i.test(msg);
+      const permanent = /violat|invalid|constraint|column|schema|does not exist|permission|policy|JWT/i.test(msg);
+      if(dupCompletion){
+        queue.shift(); saveQueue();
+      }else if(permanent){
+        queue.shift(); saveQueue();
+        toast('有一筆資料上傳失敗：' + msg, true);
+      }else{
+        flushing = false; setSync();
+        return;                       // 網路問題，保留佇列稍後重試
+      }
+    }
+  }
+  flushing = false; setSync();
+}
+
+/* ---------- 讀取 ---------- */
+async function pullAll(){
+  if(!sb || !session) return;
+  try{
+    const [a,b,c,d] = await Promise.all([
+      sb.from('schedules').select('*'),
+      sb.from('events').select('*'),
+      sb.from('completions').select('*'),
+      sb.from('categories').select('*')
+    ]);
+    const bad = [a,b,c,d].find(r=>r.error);
+    if(bad){ throw bad.error; }
+    if(queue.length) return;          // 有未上傳的變更，先不要覆蓋本機
+    state.schedules  = a.data || [];
+    state.events     = b.data || [];
+    state.completions= c.data || [];
+    state.categories = d.data || [];
+    rebuildDoneIndex();
+    state.loaded = true;
+    saveCache();
+    render();
+    setSync();
+  }catch(err){
+    console.warn('pull failed', err);
+    const msg = String(err?.message||err||'');
+    if(/does not exist|schema/i.test(msg)){
+      toast('資料表尚未建立，請先在 Supabase 執行 schema.sql', true);
+    }else{
+      toast('連線失敗，顯示的是最後同步的資料', true);
+    }
+    setSync();
+  }
+}
+
+/* ---------- 寫入 ---------- */
+function upsertLocal(list, row){
+  const i = list.findIndex(x=>x.id===row.id);
+  if(i>=0) list[i] = row; else list.push(row);
+}
+function saveSchedule(row){
+  row.user_id = session.user.id;
+  upsertLocal(state.schedules, row);
+  saveCache(); enqueue({type:'upsert', table:'schedules', row});
+}
+function deleteSchedule(id){
+  state.schedules = state.schedules.filter(x=>x.id!==id);
+  const gone = state.completions.filter(c=>c.item_id===id);
+  state.completions = state.completions.filter(c=>c.item_id!==id);
+  rebuildDoneIndex(); saveCache();
+  enqueue({type:'delete', table:'schedules', id});
+  for(const c of gone) enqueue({type:'delete', table:'completions', id:c.id});
+}
+function saveEvent(row){
+  row.user_id = session.user.id;
+  upsertLocal(state.events, row);
+  saveCache(); enqueue({type:'upsert', table:'events', row});
+}
+function deleteEvent(id){
+  state.events = state.events.filter(x=>x.id!==id);
+  const gone = state.completions.filter(c=>c.item_id===id);
+  state.completions = state.completions.filter(c=>c.item_id!==id);
+  rebuildDoneIndex(); saveCache();
+  enqueue({type:'delete', table:'events', id});
+  for(const c of gone) enqueue({type:'delete', table:'completions', id:c.id});
+}
+function toggleDone(itemId, kind, date){
+  const cur = state.doneIndex.get(doneKey(itemId,date));
+  if(cur){
+    state.completions = state.completions.filter(c=>c.id!==cur.id);
+    rebuildDoneIndex(); saveCache();
+    enqueue({type:'delete', table:'completions', id:cur.id});
+  }else{
+    const row = { id:uid(), user_id:session.user.id, item_id:itemId,
+                  item_kind:kind, occur_date:date };
+    state.completions.push(row);
+    rebuildDoneIndex(); saveCache();
+    enqueue({type:'upsert', table:'completions', row});
+  }
+}
+function addCategory(name){
+  name = String(name||'').trim();
+  if(!name) return null;
+  if(state.categories.some(c=>c.name===name)) return name;
+  const used = state.categories.length;
+  const row = { id:uid(), user_id:session.user.id, name,
+                color: PALETTE[used % PALETTE.length] };
+  state.categories.push(row);
+  saveCache(); enqueue({type:'upsert', table:'categories', row});
+  return name;
+}
+function deleteCategory(id){
+  state.categories = state.categories.filter(c=>c.id!==id);
+  saveCache(); enqueue({type:'delete', table:'categories', id});
+}
+
+/* ============================================================
+   繪製：頁面一
+   ============================================================ */
+function renderFilters(){
+  const box = $('#fl-list');
+  const cats = state.categories.map(c=>c.name);
+  const used = new Set(state.schedules.map(s=>s.category).filter(Boolean));
+  for(const u of used) if(!cats.includes(u)) cats.push(u);
+  if(!cats.length){ box.classList.add('hide'); box.innerHTML=''; return; }
+  box.classList.remove('hide');
+  box.innerHTML = `<button class="chip ${state.filter===null?'on':''}" data-c="">全部</button>` +
+    cats.map(c=>`<button class="chip ${state.filter===c?'on':''}" data-c="${esc(c)}">
+      <i class="cd" style="background:${catColor(c)}"></i>${esc(c)}</button>`).join('');
+  $$('.chip', box).forEach(b=>b.onclick = ()=>{
+    const v = b.dataset.c;
+    state.filter = (!v || state.filter===v) ? null : v;
+    renderList(); renderFilters();
+  });
+}
+
+function itemCardHTML(s){
+  const links = Array.isArray(s.links) ? s.links : [];
+  return `<button class="item" data-id="${esc(s.id)}">
+    <span class="bar" style="background:${catColor(s.category)}"></span>
+    <span class="bd">
+      <span class="ti">${esc(s.title)}</span>
+      <span class="mt">
+        <span class="tag time">${esc(whenLabel(s))}${s.time_text?' · '+esc(s.time_text):''}</span>
+        ${s.category?`<span class="tag"><i class="cd" style="background:${catColor(s.category)}"></i>${esc(s.category)}</span>`:''}
+        ${links.length?`<span class="tag lk">連結 ${links.length}</span>`:''}
+      </span>
+      ${s.description?`<span class="desc">${esc(s.description)}</span>`:''}
+    </span>
+  </button>`;
+}
+
+function renderList(){
+  const body = $('#list-body');
+  let rows = state.schedules.slice();
+  if(state.filter) rows = rows.filter(s=>s.category===state.filter);
+
+  if(!rows.length){
+    body.innerHTML = `<div class="empty"><b>${state.filter?'這個類別還沒有排程':'還沒有任何重複排程'}</b>
+      ${state.filter?'換一個類別看看，或新增一筆。':'點右下角「新增排程」，建立每天／每週／每兩週／每月要做的事。'}</div>`;
+    return;
+  }
+  const order = {daily:0, weekly:1, biweekly:2, monthly:3};
+  let html = '';
+  for(const f of FREQS){
+    const g = rows.filter(s=>s.freq===f.k).sort((a,b)=>{
+      if(f.k==='weekly'||f.k==='biweekly'){
+        const d = (Number(a.weekday)||0)-(Number(b.weekday)||0); if(d) return d;
+      }
+      if(f.k==='monthly'){
+        const d = (Number(a.month_day)||0)-(Number(b.month_day)||0); if(d) return d;
+      }
+      const ta=(a.time_text||''), tb=(b.time_text||'');
+      if(ta!==tb){ if(!ta) return 1; if(!tb) return -1; return ta.localeCompare(tb); }
+      return String(a.title).localeCompare(String(b.title));
+    });
+    if(!g.length) continue;
+    html += `<section class="group">
+      <div class="group-h"><span class="t">${f.label}</span><span class="n">${g.length}</span><span class="ln"></span></div>
+      <div class="cards">${g.map(itemCardHTML).join('')}</div>
+    </section>`;
+  }
+  body.innerHTML = html;
+  $$('.item', body).forEach(b=>b.onclick = ()=>{
+    const s = state.schedules.find(x=>x.id===b.dataset.id);
+    if(s) openDetail({kind:'schedule', row:s, mode:'edit'});
+  });
+  void order;
+}
+
+/* ============================================================
+   繪製：頁面二（月曆）
+   ============================================================ */
+function renderCal(){
+  const y = state.calY, m = state.calM;
+  $('#cal-mo').textContent = `${y} 年 ${m+1} 月`;
+
+  const first = new Date(y, m, 1);
+  const start = new Date(y, m, 1 - first.getDay());
+  const today = todayStr();
+  const cells = [];
+  for(let i=0;i<42;i++){
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate()+i);
+    const ds = ymd(d);
+    const out = d.getMonth() !== m;
+    const items = itemsOn(ds);
+    const dots = items.slice(0,8).map(it=>{
+      const done = isDone(it.row.id, ds);
+      const col = catColor(it.row.category);
+      return `<i class="${done?'done':''}" style="${done?`color:${col}`:`background:${col}`}"></i>`;
+    }).join('');
+    const chips = items.slice(0,3).map(it=>{
+      const done = isDone(it.row.id, ds);
+      const t = (it.row.time_text?it.row.time_text+' ':'') + it.row.title;
+      return `<span class="cchip ${done?'done':''}" style="border-left-color:${catColor(it.row.category)}">${esc(t)}</span>`;
+    }).join('');
+    const more = items.length>3 ? `<span class="cmore">+${items.length-3}</span>` : '';
+    cells.push(`<button class="cell ${out?'out':''} ${ds===today?'today':''} ${ds===state.selDate?'sel':''}" data-d="${ds}">
+      <span class="dn">${d.getDate()}</span>
+      <span class="dots">${dots}</span>
+      <span class="cchips">${chips}${more}</span>
+    </button>`);
+  }
+  // 若最後一列整列都不屬於本月，就不畫（避免多一列灰格）
+  const lastRowStart = new Date(start.getFullYear(), start.getMonth(), start.getDate()+35);
+  if(lastRowStart.getMonth() !== m || lastRowStart.getFullYear() !== y) cells.length = 35;
+  $('#cal-grid').innerHTML = cells.join('');
+  $$('.cell', $('#cal-grid')).forEach(c=>c.onclick = ()=>{
+    state.selDate = c.dataset.d;
+    const d = parseYmd(state.selDate);
+    if(d.getMonth()!==state.calM || d.getFullYear()!==state.calY){
+      state.calY = d.getFullYear(); state.calM = d.getMonth();
+    }
+    renderCal(); renderDay();
+  });
+  renderDay();
+}
+
+function renderDay(){
+  const ds = state.selDate, d = parseYmd(ds);
+  $('#dp-d1').textContent = `${d.getMonth()+1} 月 ${d.getDate()} 日`;
+  $('#dp-d2').textContent = `週${WD[d.getDay()]}${ds===todayStr()?' · 今天':''}`;
+  const items = itemsOn(ds);
+  const done = items.filter(it=>isDone(it.row.id, ds)).length;
+  $('#dp-prog').textContent = items.length ? `${done}/${items.length}` : '';
+
+  const box = $('#dp-list');
+  if(!items.length){
+    box.innerHTML = `<div class="dnone">這天沒有排程。<br>可用右下角新增單一行程。</div>`;
+    return;
+  }
+  box.innerHTML = items.map(it=>{
+    const r = it.row, dn = isDone(r.id, ds);
+    return `<div class="drow ${dn?'done':''}" data-id="${esc(r.id)}" data-k="${it.kind}">
+      <button class="ck ${dn?'on':''}" data-act="ck" aria-label="標記完成">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>
+      </button>
+      <button class="dmain" data-act="open">
+        <span class="dt">${esc(r.title)}</span>
+        <span class="dsub">
+          ${r.time_text?`<span class="tag time">${esc(r.time_text)}</span>`:''}
+          <span class="tag">${it.kind==='event'?'單一行程':esc(whenLabel(r))}</span>
+          ${r.category?`<span class="tag"><i class="cd" style="background:${catColor(r.category)}"></i>${esc(r.category)}</span>`:''}
+        </span>
+      </button>
+    </div>`;
+  }).join('');
+
+  $$('.drow', box).forEach(row=>{
+    const id = row.dataset.id, kind = row.dataset.k;
+    const rec = kind==='schedule'
+      ? state.schedules.find(x=>x.id===id)
+      : state.events.find(x=>x.id===id);
+    $('[data-act=ck]', row).onclick = ()=>{
+      toggleDone(id, kind, ds);
+      renderCal();
+    };
+    $('[data-act=open]', row).onclick = ()=>{
+      if(rec) openDetail({kind, row:rec, mode:'calendar', date:ds});
+    };
+  });
+}
+
+/* ============================================================
+   Modal 基礎
+   ============================================================ */
+let closeModal = null;
+function modal({title, body, footer, onClose}){
+  if(closeModal) closeModal();
+  const ov = document.createElement('div');
+  ov.className = 'ov';
+  ov.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">
+    <div class="sh-h">
+      <h2>${title}</h2>
+      <button class="iconbtn" data-x aria-label="關閉">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="sh-b">${body}</div>
+    ${footer?`<div class="sh-f">${footer}</div>`:''}
+  </div>`;
+  $('#modal-root').appendChild(ov);
+  document.body.style.overflow = 'hidden';
+
+  const close = ()=>{
+    ov.remove();
+    document.body.style.overflow = '';
+    document.removeEventListener('keydown', onKey);
+    closeModal = null;
+    if(onClose) onClose();
+  };
+  const onKey = e=>{ if(e.key==='Escape') close(); };
+  document.addEventListener('keydown', onKey);
+  ov.addEventListener('mousedown', e=>{ if(e.target===ov) close(); });
+  $('[data-x]', ov).onclick = close;
+  closeModal = close;
+  return { ov, close, sheet: $('.sheet', ov) };
+}
+
+/* ============================================================
+   詳細內容
+   ============================================================ */
+function openDetail({kind, row, mode, date}){
+  const links = Array.isArray(row.links) ? row.links : [];
+  const when = kind==='event'
+    ? `${fmtDate(row.date)}（週${WD[parseYmd(row.date).getDay()]}）`
+    : whenLabel(row);
+
+  let body = `<div class="dv-badges">
+    <span class="tag time">${esc(when)}${row.time_text?' · '+esc(row.time_text):''}</span>
+    ${row.category?`<span class="tag"><i class="cd" style="background:${catColor(row.category)}"></i>${esc(row.category)}</span>`:''}
+    <span class="tag">${kind==='event'?'單一行程':'重複排程'}</span>
+  </div>`;
+
+  if(mode==='calendar'){
+    const dn = isDone(row.id, date);
+    body += `<button class="dv-check ${dn?'on':''}" id="dv-ck">
+      <span class="ck ${dn?'on':''}" style="pointer-events:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>
+      </span>
+      <span style="flex:1">
+        <span class="t" style="display:block">${dn?'已完成':'標記為完成'}</span>
+        <span class="s">${fmtDate(date)}</span>
+      </span>
+    </button>
+    <div style="height:16px"></div>`;
+  }
+
+  body += `<div class="dv-sec">
+    <h3>敘述</h3>
+    <div class="dv-txt">${row.description ? esc(row.description) : '<span style="color:var(--muted)">（未填寫）</span>'}</div>
+  </div>`;
+
+  if(links.length){
+    body += `<div class="dv-sec"><h3>相關連結</h3>` + links.map(l=>{
+      const href = safeHref(l.url);
+      return `<a class="dv-link" href="${esc(href)}" target="_blank" rel="noopener noreferrer">
+        <span class="lt"><span class="l1">${esc(l.name || l.url)}</span><span class="l2">${esc(normUrl(l.url))}</span></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+      </a>`;
+    }).join('') + `</div>`;
+  }
+
+  let footer = '';
+  if(mode==='edit' || (mode==='calendar' && kind==='event')){
+    footer = `<button class="btn dg" data-del>刪除</button><span class="sp"></span>
+              <button class="btn" data-x2>關閉</button>
+              <button class="btn pri" data-edit>編輯</button>`;
+  }else{
+    body += `<p class="dv-note">重複排程的內容請至「重複排程」頁修改。</p>`;
+    footer = `<span class="sp"></span><button class="btn pri" data-x2>關閉</button>`;
+  }
+
+  const m = modal({ title: esc(row.title), body, footer });
+
+  const x2 = $('[data-x2]', m.ov); if(x2) x2.onclick = m.close;
+
+  const ck = $('#dv-ck', m.ov);
+  if(ck) ck.onclick = ()=>{
+    toggleDone(row.id, kind, date);
+    m.close();
+    renderCal();
+  };
+  const del = $('[data-del]', m.ov);
+  if(del) del.onclick = ()=>{
+    const what = kind==='event' ? '單一行程' : '重複排程';
+    if(!confirm(`確定刪除這筆${what}「${row.title}」？此動作無法復原。`)) return;
+    if(kind==='event') deleteEvent(row.id); else deleteSchedule(row.id);
+    m.close(); render();
+    toast('已刪除');
+  };
+  const ed = $('[data-edit]', m.ov);
+  if(ed) ed.onclick = ()=>{
+    m.close();
+    if(kind==='event') openEventForm(row); else openScheduleForm(row);
+  };
+}
+
+/* ============================================================
+   共用表單片段
+   ============================================================ */
+function catSelectHTML(cur){
+  const names = state.categories.map(c=>c.name);
+  if(cur && !names.includes(cur)) names.push(cur);
+  return `<select class="inp" id="f-cat">
+    <option value="">（不分類）</option>
+    ${names.map(n=>`<option value="${esc(n)}" ${n===cur?'selected':''}>${esc(n)}</option>`).join('')}
+    <option value="__new__">＋ 新增類別…</option>
+  </select>`;
+}
+function linksHTML(links){
+  const rows = (links && links.length ? links : []).map(l=>linkRowHTML(l)).join('');
+  return `<div id="f-links">${rows}</div>
+    <button type="button" class="addlink" id="f-addlink">＋ 新增連結</button>`;
+}
+function linkRowHTML(l){
+  l = l || {name:'', url:''};
+  return `<div class="linkrow">
+    <input class="inp n" placeholder="名稱" value="${esc(l.name||'')}">
+    <input class="inp u" placeholder="網址" value="${esc(l.url||'')}" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <button type="button" class="xbtn" data-rm aria-label="移除">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>`;
+}
+function wireLinks(root){
+  const box = $('#f-links', root);
+  const bind = row => { $('[data-rm]', row).onclick = ()=>row.remove(); };
+  $$('.linkrow', box).forEach(bind);
+  $('#f-addlink', root).onclick = ()=>{
+    box.insertAdjacentHTML('beforeend', linkRowHTML());
+    bind(box.lastElementChild);
+    $('.n', box.lastElementChild).focus();
+  };
+}
+function readLinks(root){
+  return $$('.linkrow', $('#f-links', root)).map(r=>({
+    name: $('.n', r).value.trim(),
+    url:  $('.u', r).value.trim()
+  })).filter(l=>l.url).map(l=>({ name: l.name || l.url, url: normUrl(l.url) }));
+}
+function wireCat(root){
+  const sel = $('#f-cat', root);
+  let prev = sel.value;
+  sel.onchange = ()=>{
+    if(sel.value === '__new__'){
+      const name = prompt('新類別名稱（例：教學CR、臨床事務）');
+      const ok = name ? addCategory(name) : null;
+      if(ok){
+        sel.insertAdjacentHTML('afterbegin','');
+        const opt = document.createElement('option');
+        opt.value = ok; opt.textContent = ok;
+        sel.insertBefore(opt, sel.lastElementChild);
+        sel.value = ok;
+        renderFilters();
+      }else{
+        sel.value = prev;
+      }
+    }
+    prev = sel.value;
+  };
+}
+function showFormErr(root, msg){
+  const e = $('#f-err', root);
+  e.textContent = msg; e.classList.remove('hide');
+  $('.sh-b', root.closest('.ov') || root).scrollTop = 0;
+}
+
+/* ============================================================
+   排程表單（頁面一）
+   ============================================================ */
+function openScheduleForm(existing){
+  const s = existing || {
+    id:uid(), title:'', description:'', freq:'weekly',
+    weekday:new Date().getDay(), month_day:new Date().getDate(),
+    anchor_date:null, time_text:'', category:'', links:[]
+  };
+  const body = `
+    <div id="f-err" class="err hide"></div>
+    <div class="fld"><label for="f-title">標題 <span style="color:var(--hot)">*</span></label>
+      <input id="f-title" class="inp" value="${esc(s.title)}" placeholder="例：CR 教學會議" maxlength="120"></div>
+    <div class="fld"><label>重複頻率</label>
+      <div class="seg" id="f-freq">
+        ${FREQS.map(f=>`<button type="button" data-f="${f.k}" class="${s.freq===f.k?'on':''}">${f.label}</button>`).join('')}
+      </div></div>
+    <div class="fld hide" id="w-week"><label>星期幾</label>
+      <div class="wk" id="f-wd">
+        ${WD.map((w,i)=>`<button type="button" data-w="${i}" class="${(i===0||i===6)?'we':''} ${Number(s.weekday)===i?'on':''}">${w}</button>`).join('')}
+      </div></div>
+    <div class="fld hide" id="w-anchor"><label for="f-anchor">起算日（決定是「這一週」還是「下一週」）</label>
+      <input id="f-anchor" class="inp" type="date" value="${esc(s.anchor_date||'')}">
+      <p class="hint">從這天起，每隔 14 天出現一次。</p></div>
+    <div class="fld hide" id="w-month"><label for="f-md">每月幾號</label>
+      <select id="f-md" class="inp">
+        ${Array.from({length:31},(_,i)=>i+1).map(n=>`<option value="${n}" ${Number(s.month_day)===n?'selected':''}>${n} 號</option>`).join('')}
+      </select>
+      <p class="hint">若當月沒有這一天（例如 31 號遇到小月），會落在該月最後一天。</p></div>
+    <div class="fld"><label for="f-time">時間（選填）</label>
+      <input id="f-time" class="inp" value="${esc(s.time_text||'')}" placeholder="例：08:00、晨會後" maxlength="40"></div>
+    <div class="fld"><label for="f-cat">類別</label>${catSelectHTML(s.category)}</div>
+    <div class="fld"><label for="f-desc">敘述（選填）</label>
+      <textarea id="f-desc" class="inp" placeholder="這件事要做什麼、注意事項…">${esc(s.description||'')}</textarea></div>
+    <div class="fld"><label>相關連結（選填）</label>${linksHTML(s.links)}</div>`;
+
+  const footer = `<span class="sp"></span><button class="btn" data-cancel>取消</button>
+                  <button class="btn pri" data-save>${existing?'儲存變更':'新增排程'}</button>`;
+  const m = modal({ title: existing?'編輯排程':'新增重複排程', body, footer });
+  const R = m.ov;
+
+  let freq = s.freq;
+  let weekday = Number(s.weekday) || 0;
+
+  function syncFreqUI(){
+    $$('#f-freq button', R).forEach(b=>b.classList.toggle('on', b.dataset.f===freq));
+    $('#w-week', R).classList.toggle('hide', !(freq==='weekly'||freq==='biweekly'));
+    $('#w-anchor', R).classList.toggle('hide', freq!=='biweekly');
+    $('#w-month', R).classList.toggle('hide', freq!=='monthly');
+    if(freq==='biweekly' && !$('#f-anchor',R).value) $('#f-anchor',R).value = nextWeekdayFrom(todayStr(), weekday);
+  }
+  function nextWeekdayFrom(from, wd){
+    const d = parseYmd(from);
+    const delta = (wd - d.getDay() + 7) % 7;
+    return addDays(from, delta);
+  }
+  $$('#f-freq button', R).forEach(b=>b.onclick = ()=>{ freq = b.dataset.f; syncFreqUI(); });
+  $$('#f-wd button', R).forEach(b=>b.onclick = ()=>{
+    weekday = Number(b.dataset.w);
+    $$('#f-wd button', R).forEach(x=>x.classList.toggle('on', x===b));
+    if(freq==='biweekly') $('#f-anchor',R).value = nextWeekdayFrom(todayStr(), weekday);
+  });
+  syncFreqUI();
+  wireLinks(R); wireCat(R);
+  setTimeout(()=>{ if(!existing) $('#f-title', R).focus(); }, 60);
+
+  $('[data-cancel]', R).onclick = m.close;
+  $('[data-save]', R).onclick = ()=>{
+    const title = $('#f-title', R).value.trim();
+    if(!title){ showFormErr(R, '請填寫標題。'); $('#f-title',R).focus(); return; }
+    let anchor = null;
+    if(freq==='biweekly'){
+      anchor = $('#f-anchor', R).value || nextWeekdayFrom(todayStr(), weekday);
+      const ad = parseYmd(anchor);
+      if(ad.getDay() !== weekday) anchor = nextWeekdayFrom(anchor, weekday);
+    }
+    const row = {
+      id: s.id,
+      title,
+      description: $('#f-desc', R).value.trim(),
+      freq,
+      weekday: (freq==='weekly'||freq==='biweekly') ? weekday : null,
+      month_day: freq==='monthly' ? Number($('#f-md', R).value) : null,
+      anchor_date: anchor,
+      time_text: $('#f-time', R).value.trim(),
+      category: ($('#f-cat', R).value === '__new__' ? '' : $('#f-cat', R).value),
+      links: readLinks(R),
+      start_date: s.start_date || null
+    };
+    saveSchedule(row);
+    m.close(); render();
+    toast(existing ? '已儲存' : '已新增排程');
+  };
+}
+
+/* ============================================================
+   單一行程表單（頁面二）
+   ============================================================ */
+function openEventForm(existing, presetDate){
+  const e = existing || {
+    id:uid(), title:'', description:'', date: presetDate || state.selDate,
+    time_text:'', category:'', links:[]
+  };
+  const body = `
+    <div id="f-err" class="err hide"></div>
+    <div class="fld"><label for="f-title">標題 <span style="color:var(--hot)">*</span></label>
+      <input id="f-title" class="inp" value="${esc(e.title)}" placeholder="例：科部演講" maxlength="120"></div>
+    <div class="fld"><label for="f-date">日期 <span style="color:var(--hot)">*</span></label>
+      <input id="f-date" class="inp" type="date" value="${esc(e.date)}"></div>
+    <div class="fld"><label for="f-time">時間（選填）</label>
+      <input id="f-time" class="inp" value="${esc(e.time_text||'')}" placeholder="例：14:00" maxlength="40"></div>
+    <div class="fld"><label for="f-cat">類別</label>${catSelectHTML(e.category)}</div>
+    <div class="fld"><label for="f-desc">敘述（選填）</label>
+      <textarea id="f-desc" class="inp">${esc(e.description||'')}</textarea></div>
+    <div class="fld"><label>相關連結（選填）</label>${linksHTML(e.links)}</div>`;
+
+  const footer = `<span class="sp"></span><button class="btn" data-cancel>取消</button>
+                  <button class="btn pri" data-save>${existing?'儲存變更':'新增行程'}</button>`;
+  const m = modal({ title: existing?'編輯單一行程':'新增單一行程', body, footer });
+  const R = m.ov;
+  wireLinks(R); wireCat(R);
+  setTimeout(()=>{ if(!existing) $('#f-title', R).focus(); }, 60);
+
+  $('[data-cancel]', R).onclick = m.close;
+  $('[data-save]', R).onclick = ()=>{
+    const title = $('#f-title', R).value.trim();
+    const date  = $('#f-date', R).value;
+    if(!title){ showFormErr(R, '請填寫標題。'); return; }
+    if(!date){  showFormErr(R, '請選擇日期。'); return; }
+    const row = {
+      id: e.id, title, date,
+      description: $('#f-desc', R).value.trim(),
+      time_text: $('#f-time', R).value.trim(),
+      category: ($('#f-cat', R).value === '__new__' ? '' : $('#f-cat', R).value),
+      links: readLinks(R)
+    };
+    saveEvent(row);
+    state.selDate = date;
+    const d = parseYmd(date);
+    state.calY = d.getFullYear(); state.calM = d.getMonth();
+    m.close(); render();
+    toast(existing ? '已儲存' : '已新增行程');
+  };
+}
+
+/* ============================================================
+   類別管理
+   ============================================================ */
+function openCatManager(){
+  const draw = () => state.categories.length
+    ? state.categories.map(c=>`<div class="drow" data-id="${esc(c.id)}">
+        <span class="tag" style="background:${c.color}22;color:${c.color};font-weight:600">
+          <i class="cd" style="background:${c.color}"></i>${esc(c.name)}</span>
+        <span style="flex:1"></span>
+        <button class="xbtn" data-rm aria-label="刪除">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button></div>`).join('')
+    : `<div class="dnone">還沒有類別。</div>`;
+
+  const m = modal({
+    title:'管理類別',
+    body:`<div id="cat-box" style="display:flex;flex-direction:column;gap:6px">${draw()}</div>
+          <p class="hint">刪除類別不會刪掉排程，只是移除這個標籤選項。</p>`,
+    footer:`<button class="btn" data-add>＋ 新增類別</button><span class="sp"></span>
+            <button class="btn pri" data-x2>完成</button>`
+  });
+  const R = m.ov;
+  const wire = ()=>{
+    $$('#cat-box .drow', R).forEach(row=>{
+      $('[data-rm]', row).onclick = ()=>{
+        deleteCategory(row.dataset.id);
+        $('#cat-box', R).innerHTML = draw(); wire();
+        renderFilters(); render();
+      };
+    });
+  };
+  wire();
+  $('[data-add]', R).onclick = ()=>{
+    const n = prompt('新類別名稱');
+    if(n && addCategory(n)){ $('#cat-box', R).innerHTML = draw(); wire(); renderFilters(); }
+  };
+  $('[data-x2]', R).onclick = m.close;
+}
+
+/* ============================================================
+   選單
+   ============================================================ */
+let menuEl = null;
+function closeMenu(){ if(menuEl){ menuEl.remove(); menuEl = null; document.removeEventListener('click', onDocClick, true); } }
+function onDocClick(e){ if(menuEl && !menuEl.contains(e.target) && e.target.closest('#btn-menu')===null) closeMenu(); }
+function openMenu(){
+  if(menuEl){ closeMenu(); return; }
+  menuEl = document.createElement('div');
+  menuEl.className = 'menu';
+  menuEl.innerHTML = `
+    <div class="who"><b>${esc(session?.user?.email||'')}</b><span>已登入，資料自動同步</span></div>
+    <button data-a="cats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0l-7-7A2 2 0 0 1 3 12.2V5a2 2 0 0 1 2-2h7.2a2 2 0 0 1 1.4.6l7 7a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor"/></svg>管理類別</button>
+    <button data-a="sync"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.5M4 13a8 8 0 0 0 14.3 4.5"/><path d="M20 4v4h-4M4 20v-4h4"/></svg>立即重新同步</button>
+    <button data-a="export"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>匯出備份 JSON</button>
+    <button data-a="out" class="dg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17l5-5-5-5M20 12H9M11 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5"/></svg>登出</button>`;
+  document.body.appendChild(menuEl);
+  setTimeout(()=>document.addEventListener('click', onDocClick, true), 0);
+
+  menuEl.querySelector('[data-a=cats]').onclick   = ()=>{ closeMenu(); openCatManager(); };
+  menuEl.querySelector('[data-a=sync]').onclick   = async ()=>{ closeMenu(); await flushQueue(); await pullAll(); toast('已重新同步'); };
+  menuEl.querySelector('[data-a=export]').onclick = ()=>{ closeMenu(); exportJSON(); };
+  menuEl.querySelector('[data-a=out]').onclick    = async ()=>{
+    closeMenu();
+    if(queue.length && !confirm(`還有 ${queue.length} 筆變更未上傳，仍要登出嗎？`)) return;
+    await sb.auth.signOut();
+    location.reload();
+  };
+}
+function exportJSON(){
+  const data = { exported_at:new Date().toISOString(), email:session?.user?.email,
+    schedules:state.schedules, events:state.events,
+    completions:state.completions, categories:state.categories };
+  const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `todo-backup-${todayStr()}.json`;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
+}
+
+/* ============================================================
+   頁面切換 / 總繪製
+   ============================================================ */
+function setPage(p){
+  state.page = p;
+  $$('#nav button').forEach(b=>b.classList.toggle('on', b.dataset.p===p));
+  $('#p-list').classList.toggle('hide', p!=='list');
+  $('#p-cal').classList.toggle('hide', p!=='cal');
+  $('#fab-t').textContent = p==='list' ? '新增排程' : '新增行程';
+  try{ localStorage.setItem('todo.page', p); }catch(e){}
+  window.scrollTo({top:0});
+  render();
+}
+function render(){
+  if(state.page==='list'){ renderFilters(); renderList(); }
+  else { renderCal(); }
+  setSync();
+}
+
+/* ============================================================
+   啟動
+   ============================================================ */
+function show(id){
+  ['#scr-setup','#scr-auth','#scr-app'].forEach(s=>$(s).classList.add('hide'));
+  $(id).classList.remove('hide');
+  document.body.classList.toggle('app-on', id==='#scr-app');
+}
+
+function getConfig(){
+  if(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) return {...CONFIG};
+  try{
+    const raw = localStorage.getItem(cfgKey);
+    if(raw){
+      const c = JSON.parse(raw);
+      if(c.SUPABASE_URL && c.SUPABASE_ANON_KEY) return c;
+    }
+  }catch(e){}
+  return null;
+}
+
+function initSetupScreen(){
+  show('#scr-setup');
+  $('#su-save').onclick = ()=>{
+    const url = $('#su-url').value.trim().replace(/\/+$/,'');
+    const key = $('#su-key').value.trim();
+    const err = $('#su-err');
+    if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url)){
+      err.textContent = 'Project URL 格式看起來不對，應該像 https://xxxx.supabase.co'; err.classList.remove('hide'); return;
+    }
+    if(key.length < 40){
+      err.textContent = 'anon key 看起來太短，請重新複製。'; err.classList.remove('hide'); return;
+    }
+    localStorage.setItem(cfgKey, JSON.stringify({SUPABASE_URL:url, SUPABASE_ANON_KEY:key}));
+    location.reload();
+  };
+}
+
+function initAuthScreen(){
+  show('#scr-auth');
+  let mode = 'in';
+  const setMode = m=>{
+    mode = m;
+    $('#tab-in').classList.toggle('on', m==='in');
+    $('#tab-up').classList.toggle('on', m==='up');
+    $('#au-go').textContent = m==='in' ? '登入' : '建立帳號';
+    $('#au-pw').setAttribute('autocomplete', m==='in' ? 'current-password' : 'new-password');
+    $('#au-hint').textContent = m==='in'
+      ? '登入狀態會記住，之後開啟不需重新登入。'
+      : '用同一組 Email 與密碼，就能在手機與電腦看到同一份資料。';
+    $('#au-err').classList.add('hide'); $('#au-ok').classList.add('hide');
+  };
+  $('#tab-in').onclick = ()=>setMode('in');
+  $('#tab-up').onclick = ()=>setMode('up');
+
+  $('#au-form').onsubmit = async ev=>{
+    ev.preventDefault();
+    const email = $('#au-email').value.trim();
+    const pw = $('#au-pw').value;
+    const err = $('#au-err'), ok = $('#au-ok'), btn = $('#au-go');
+    err.classList.add('hide'); ok.classList.add('hide');
+    if(!email || !pw){ err.textContent='請填寫 Email 與密碼。'; err.classList.remove('hide'); return; }
+    if(mode==='up' && pw.length < 6){ err.textContent='密碼至少 6 個字元。'; err.classList.remove('hide'); return; }
+    btn.disabled = true; btn.textContent = '處理中…';
+    try{
+      if(mode==='in'){
+        const { error } = await sb.auth.signInWithPassword({ email, password: pw });
+        if(error) throw error;
+      }else{
+        const { data, error } = await sb.auth.signUp({ email, password: pw });
+        if(error) throw error;
+        if(!data.session){
+          ok.textContent = '帳號已建立。請到信箱點擊確認信中的連結，再回來登入。';
+          ok.classList.remove('hide');
+          setMode('in');
+          btn.disabled = false; btn.textContent = '登入';
+          return;
+        }
+      }
+    }catch(e2){
+      const msg = String(e2?.message||e2);
+      err.textContent = /Invalid login/i.test(msg) ? 'Email 或密碼不正確。'
+        : /already registered/i.test(msg) ? '這個 Email 已經註冊過了，請直接登入。'
+        : /Email not confirmed/i.test(msg) ? '請先到信箱點擊確認信中的連結。'
+        : msg;
+      err.classList.remove('hide');
+      btn.disabled = false; btn.textContent = mode==='in' ? '登入' : '建立帳號';
+    }
+  };
+  setMode('in');
+}
+
+async function startApp(){
+  show('#scr-app');
+  loadQueue();
+  const hadCache = loadCache();
+
+  const now = new Date();
+  state.calY = now.getFullYear();
+  state.calM = now.getMonth();
+  state.selDate = todayStr();
+  try{ state.page = localStorage.getItem('todo.page') === 'cal' ? 'cal' : 'list'; }catch(e){}
+
+  // 事件
+  $$('#nav button').forEach(b=>b.onclick = ()=>setPage(b.dataset.p));
+  $('#btn-menu').onclick = e=>{ e.stopPropagation(); openMenu(); };
+  $('#fab').onclick = ()=>{
+    if(state.page==='list') openScheduleForm(null);
+    else openEventForm(null, state.selDate);
+  };
+  $('#cal-prev').onclick = ()=>{ shiftMonth(-1); };
+  $('#cal-next').onclick = ()=>{ shiftMonth(1); };
+  $('#cal-today').onclick = ()=>{
+    const d = new Date();
+    state.calY = d.getFullYear(); state.calM = d.getMonth(); state.selDate = todayStr();
+    renderCal();
+  };
+
+  setPage(state.page);
+  if(hadCache) render();
+
+  await flushQueue();   // 先把離線期間的變更送上去，再拉回伺服器版本
+  await pullAll();
+
+  // 首次使用：建立預設類別
+  if(state.loaded && !state.categories.length && !state.schedules.length){
+    for(const n of DEFAULT_CATS) addCategory(n);
+    render();
+  }
+}
+function shiftMonth(n){
+  let y = state.calY, m = state.calM + n;
+  if(m < 0){ m = 11; y--; } if(m > 11){ m = 0; y++; }
+  state.calY = y; state.calM = m;
+  const dim = daysInMonth(y,m);
+  const day = Math.min(parseYmd(state.selDate).getDate(), dim);
+  state.selDate = `${y}-${pad(m+1)}-${pad(day)}`;
+  renderCal();
+}
+
+window.addEventListener('online',  ()=>{ state.online = true;  setSync(); flushQueue(); pullAll(); });
+window.addEventListener('offline', ()=>{ state.online = false; setSync(); });
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'visible' && session){ flushQueue().then(()=>pullAll()); }
+});
+window.addEventListener('beforeunload', e=>{
+  if(queue.length){ e.preventDefault(); e.returnValue = ''; }
+});
+
+/* 試用模式：網址加上 ?demo=1，資料只存在這台裝置的瀏覽器，
+   不需要 Supabase，可先體驗介面。 */
+function demoClient(){
+  const K = 'todo.demo.db';
+  const load = ()=>{ try{ return JSON.parse(localStorage.getItem(K)) || {}; }catch(e){ return {}; } };
+  const save = d => { try{ localStorage.setItem(K, JSON.stringify(d)); }catch(e){} };
+  return {
+    auth:{
+      getSession: async ()=>({ data:{ session: DEMO_SESSION } }),
+      onAuthStateChange: ()=>({ data:{ subscription:{ unsubscribe(){} } } }),
+      signOut: async ()=>{ localStorage.removeItem(K); }
+    },
+    from(t){
+      return {
+        select: async ()=>({ data: load()[t] || [], error:null }),
+        upsert: async row =>{
+          const d = load(), a = d[t] || [];
+          const i = a.findIndex(x=>x.id===row.id);
+          if(i>=0) a[i] = row; else a.push(row);
+          d[t] = a; save(d); return { error:null };
+        },
+        delete(){
+          return { eq: async (_col, id)=>{
+            const d = load();
+            d[t] = (d[t]||[]).filter(x=>x.id!==id);
+            save(d); return { error:null };
+          }};
+        }
+      };
+    }
+  };
+}
+const DEMO_SESSION = { user:{ id:'demo-user', email:'試用模式（僅存在本機）' } };
+
+(async function main(){
+  if(new URLSearchParams(location.search).get('demo') === '1'){
+    sb = demoClient();
+    session = DEMO_SESSION;
+    startApp();
+    setTimeout(()=>toast('試用模式：資料只存在這台裝置，不會同步'), 500);
+    return;
+  }
+  const cfg = getConfig();
+  if(!cfg){ initSetupScreen(); return; }
+  if(typeof window.supabase === 'undefined'){
+    show('#scr-auth');
+    $('#au-err').textContent = '無法載入 Supabase 程式庫，請確認網路連線後重新整理。';
+    $('#au-err').classList.remove('hide');
+    return;
+  }
+  sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+    auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:false }
+  });
+  const { data } = await sb.auth.getSession();
+  session = data?.session || null;
+
+  sb.auth.onAuthStateChange((evt, s)=>{
+    const had = !!session;
+    session = s;
+    if(!had && s){ startApp(); }
+    if(had && !s){ location.reload(); }
+  });
+
+  if(session) startApp(); else initAuthScreen();
+})();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>

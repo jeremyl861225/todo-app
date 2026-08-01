@@ -1,0 +1,87 @@
+-- =============================================================
+--  待辦事項 App — Supabase 資料表
+--  用法：Supabase 專案 → 左側 SQL Editor → New query → 全部貼上 → Run
+--  可重複執行，不會刪除既有資料。
+-- =============================================================
+
+create extension if not exists pgcrypto;
+
+-- ---------- 類別 ----------
+create table if not exists public.categories (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  name        text not null,
+  color       text not null default '#4E6B57',
+  created_at  timestamptz not null default now(),
+  unique (user_id, name)
+);
+
+-- ---------- 重複排程（頁面一）----------
+create table if not exists public.schedules (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  title       text not null,
+  description text default '',
+  freq        text not null check (freq in ('daily','weekly','biweekly','monthly')),
+  weekday     int,          -- 0=週日 … 6=週六（每週／每兩週用）
+  month_day   int,          -- 1..31（每月用）
+  anchor_date date,         -- 每兩週的起算日
+  start_date  date,         -- 保留：從哪天開始生效
+  time_text   text default '',
+  category    text default '',
+  links       jsonb not null default '[]'::jsonb,
+  created_at  timestamptz not null default now()
+);
+
+-- ---------- 單一行程（頁面二）----------
+create table if not exists public.events (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  title       text not null,
+  description text default '',
+  date        date not null,
+  time_text   text default '',
+  category    text default '',
+  links       jsonb not null default '[]'::jsonb,
+  created_at  timestamptz not null default now()
+);
+
+-- ---------- 完成紀錄（某項目在某一天被勾選）----------
+create table if not exists public.completions (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  item_id     uuid not null,
+  item_kind   text not null check (item_kind in ('schedule','event')),
+  occur_date  date not null,
+  created_at  timestamptz not null default now(),
+  unique (user_id, item_id, occur_date)
+);
+
+create index if not exists completions_lookup
+  on public.completions (user_id, occur_date);
+create index if not exists schedules_user on public.schedules (user_id);
+create index if not exists events_user_date on public.events (user_id, date);
+
+-- =============================================================
+--  Row Level Security：每個人只看得到自己的資料
+-- =============================================================
+alter table public.categories  enable row level security;
+alter table public.schedules   enable row level security;
+alter table public.events      enable row level security;
+alter table public.completions enable row level security;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['categories','schedules','events','completions'] loop
+    execute format('drop policy if exists own_select on public.%I', t);
+    execute format('drop policy if exists own_insert on public.%I', t);
+    execute format('drop policy if exists own_update on public.%I', t);
+    execute format('drop policy if exists own_delete on public.%I', t);
+
+    execute format('create policy own_select on public.%I for select using (auth.uid() = user_id)', t);
+    execute format('create policy own_insert on public.%I for insert with check (auth.uid() = user_id)', t);
+    execute format('create policy own_update on public.%I for update using (auth.uid() = user_id) with check (auth.uid() = user_id)', t);
+    execute format('create policy own_delete on public.%I for delete using (auth.uid() = user_id)', t);
+  end loop;
+end $$;
