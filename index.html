@@ -53,7 +53,10 @@ header.top{
 }
 .top-in{display:flex;align-items:center;gap:12px;min-height:56px}
 .brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.02em;font-size:16px;white-space:nowrap}
-.brand .mk{width:22px;height:22px;flex:none}
+/* 與主畫面 icon 同一張圖，圓角處理成 app 圖示的樣子 */
+.appicon{display:block;object-fit:contain;background:#EEEEEE;
+  border-radius:22.5%;box-shadow:0 1px 2px rgba(78,64,40,.14)}
+.brand .mk{width:26px;height:26px;flex:none}
 .top-sp{flex:1}
 .pill{
   display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;
@@ -339,7 +342,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 .authbox{width:100%;max-width:392px;background:var(--card);border:1px solid var(--line);
   border-radius:var(--r-lg);box-shadow:var(--sh-2);padding:28px 24px calc(24px + env(safe-area-inset-bottom))}
 .authbox .lg{display:flex;flex-direction:column;align-items:center;gap:9px;margin:0 0 22px;text-align:center}
-.authbox .lg svg{width:46px;height:46px}
+.authbox .lg .lg-icon{width:52px;height:52px}
 .authbox .lg b{font-size:19px;letter-spacing:.03em}
 .authbox .lg span{font-size:13px;color:var(--muted)}
 .authtabs{display:flex;gap:4px;background:var(--bg2);border-radius:999px;padding:4px;margin:0 0 20px}
@@ -442,13 +445,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 <section id="scr-auth" class="authwrap hide">
   <div class="authbox">
     <div class="lg">
-      <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
-        <rect x="4" y="7" width="40" height="37" rx="8" fill="#4E6B57"/>
-        <rect x="4" y="7" width="40" height="10" rx="8" fill="#3C5344"/>
-        <rect x="13" y="3" width="4.5" height="9" rx="2.25" fill="#B0603A"/>
-        <rect x="30.5" y="3" width="4.5" height="9" rx="2.25" fill="#B0603A"/>
-        <path d="M16 30.5l5.2 5.2L33 24" stroke="#FFFCF6" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+      <img class="appicon lg-icon" src="icon-192.png" alt="" width="52" height="52">
       <b>待辦事項</b>
       <span>重複排程與月曆，跨裝置同步</span>
     </div>
@@ -478,13 +475,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   <header class="top">
     <div class="wrap top-in">
       <div class="brand">
-        <svg class="mk" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-          <rect x="4" y="7" width="40" height="37" rx="8" fill="#4E6B57"/>
-          <rect x="4" y="7" width="40" height="10" rx="8" fill="#3C5344"/>
-          <rect x="13" y="3" width="4.5" height="9" rx="2.25" fill="#B0603A"/>
-          <rect x="30.5" y="3" width="4.5" height="9" rx="2.25" fill="#B0603A"/>
-          <path d="M16 30.5l5.2 5.2L33 24" stroke="#FFFCF6" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        <img class="appicon mk" src="icon-192.png" alt="" width="26" height="26">
         <span>待辦事項</span>
       </div>
       <div class="top-sp"></div>
@@ -1008,7 +999,7 @@ function itemCardHTML(s){
       <span class="mt">
         <span class="tag time">${esc(whenLabel(s))}${s.time_text?' · '+esc(s.time_text):''}</span>
         ${ended?`<span class="tag over">已結束 ${esc(fmtDate(s.end_date))}</span>`
-          :pending?`<span class="tag soon">${esc(fmtDate(s.start_date))} 起</span>`
+          :pending?`<span class="tag soon">${esc(rangeLabel(s))}</span>`
           :s.end_date?`<span class="tag">至 ${esc(fmtDate(s.end_date))}</span>`:''}
         ${s.category?`<span class="tag"><i class="cd" style="background:${catColor(s.category)}"></i>${esc(s.category)}</span>`:''}
         ${links.length?`<span class="tag lk">連結 ${links.length}</span>`:''}
@@ -1256,16 +1247,12 @@ function openDetail({kind, row, mode, date}){
   let footer = '';
   if(mode==='edit' || (mode==='calendar' && kind==='event')){
     footer = `<button class="btn dg" data-del>刪除</button><span class="sp"></span>
-              <button class="btn" data-x2>關閉</button>
               <button class="btn pri" data-edit>編輯</button>`;
   }else{
     body += `<p class="dv-note">重複排程的內容請至「重複排程」頁修改。</p>`;
-    footer = `<span class="sp"></span><button class="btn pri" data-x2>關閉</button>`;
   }
 
   const m = modal({ title: esc(row.title), body, footer });
-
-  const x2 = $('[data-x2]', m.ov); if(x2) x2.onclick = m.close;
 
   const ck = $('#dv-ck', m.ov);
   if(ck) ck.onclick = ()=>{
