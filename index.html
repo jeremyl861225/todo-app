@@ -419,6 +419,8 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 .authtabs{display:flex;gap:4px;background:var(--bg2);border-radius:999px;padding:4px;margin:0 0 20px}
 .authtabs button{flex:1;height:34px;border-radius:999px;font-size:14px;font-weight:600;color:var(--ink2)}
 .authtabs button.on{background:var(--card);color:var(--accent-ink);box-shadow:var(--sh-1)}
+.linkbtn{font-size:13px;color:var(--accent-ink);font-weight:600;padding:6px 8px;border-radius:8px}
+.linkbtn:hover{background:var(--accent-soft)}
 .ok{font-size:13px;color:var(--accent-ink);background:var(--accent-soft);border:1px solid #CDDCD0;
   border-radius:var(--r-sm);padding:9px 11px;margin:0 0 14px;line-height:1.6}
 
@@ -522,7 +524,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <b>待辦事項</b>
       <span>重複排程與月曆，跨裝置同步</span>
     </div>
-    <div class="authtabs">
+    <div class="authtabs" id="au-tabs">
       <button id="tab-in" class="on">登入</button>
       <button id="tab-up">註冊</button>
     </div>
@@ -533,13 +535,41 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <label for="au-email">Email</label>
         <input id="au-email" class="inp" type="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="you@example.com">
       </div>
-      <div class="fld">
+      <div class="fld" id="au-pw-fld">
         <label for="au-pw">密碼</label>
         <input id="au-pw" class="inp" type="password" autocomplete="current-password" placeholder="至少 6 個字元">
       </div>
       <button class="btn pri wide" id="au-go" type="submit">登入</button>
     </form>
     <p class="hint" id="au-hint" style="text-align:center;margin-top:14px">登入狀態會記住，之後開啟不需重新登入。</p>
+    <div style="text-align:center;margin-top:12px">
+      <button class="linkbtn" id="au-forgot">忘記密碼？</button>
+      <button class="linkbtn hide" id="au-back">← 回到登入</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 重設密碼（從信件連結進來） ============ -->
+<section id="scr-reset" class="authwrap hide">
+  <div class="authbox">
+    <div class="lg">
+      <img class="appicon lg-icon" src="mark.png" alt="" width="314" height="270">
+      <b>設定新密碼</b>
+      <span id="rs-who">請輸入要使用的新密碼</span>
+    </div>
+    <div id="rs-err" class="err hide"></div>
+    <form id="rs-form" novalidate>
+      <div class="fld">
+        <label for="rs-pw">新密碼</label>
+        <input id="rs-pw" class="inp" type="password" autocomplete="new-password" placeholder="至少 6 個字元">
+      </div>
+      <div class="fld">
+        <label for="rs-pw2">再輸入一次</label>
+        <input id="rs-pw2" class="inp" type="password" autocomplete="new-password" placeholder="確認新密碼">
+      </div>
+      <button class="btn pri wide" id="rs-go" type="submit">設定新密碼</button>
+    </form>
+    <p class="hint" style="text-align:center;margin-top:14px">設定完成後會直接進入 App。</p>
   </div>
 </section>
 
@@ -1788,6 +1818,7 @@ function openMenu(){
     <button data-a="sync"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.5M4 13a8 8 0 0 0 14.3 4.5"/><path d="M20 4v4h-4M4 20v-4h4"/></svg>立即重新同步</button>
     <button data-a="import"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M8 7l4-4 4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>匯入 JSON</button>
     <button data-a="export"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>匯出備份 JSON</button>
+    <button data-a="pw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15" r="1.2" fill="currentColor"/></svg>更改密碼</button>
     <button data-a="out" class="dg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17l5-5-5-5M20 12H9M11 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5"/></svg>登出</button>`;
   document.body.appendChild(menuEl);
   setTimeout(()=>document.addEventListener('click', onDocClick, true), 0);
@@ -1796,6 +1827,7 @@ function openMenu(){
   menuEl.querySelector('[data-a=sync]').onclick   = async ()=>{ closeMenu(); await flushQueue(); await pullAll(); toast('已重新同步'); };
   menuEl.querySelector('[data-a=import]').onclick = ()=>{ closeMenu(); openImportMenu(); };
   menuEl.querySelector('[data-a=export]').onclick = ()=>{ closeMenu(); exportJSON(); };
+  menuEl.querySelector('[data-a=pw]').onclick     = ()=>{ closeMenu(); openPasswordForm(); };
   menuEl.querySelector('[data-a=out]').onclick    = async ()=>{
     closeMenu();
     if(queue.length && !confirm(`還有 ${queue.length} 筆變更未上傳，仍要登出嗎？`)) return;
@@ -1964,6 +1996,51 @@ function openImportMenu(){
   }).catch(()=>{});
 }
 
+/* ---------- 更改密碼 ---------- */
+function openPasswordForm(){
+  if(session?.user?.id === 'demo-user'){ toast('試用模式沒有帳號，無法更改密碼', true); return; }
+  const m = modal({
+    title:'更改密碼',
+    body:`<div id="f-err" class="err hide"></div>
+      <p class="hint" style="margin:0 0 14px">變更後其他裝置仍會保持登入，不需要重新登入。</p>
+      <div class="fld"><label for="p-old">目前密碼</label>
+        <input id="p-old" class="inp" type="password" autocomplete="current-password"></div>
+      <div class="fld"><label for="p-new">新密碼</label>
+        <input id="p-new" class="inp" type="password" autocomplete="new-password" placeholder="至少 6 個字元"></div>
+      <div class="fld"><label for="p-new2">再輸入一次</label>
+        <input id="p-new2" class="inp" type="password" autocomplete="new-password"></div>`,
+    footer:`<span class="sp"></span><button class="btn" data-cancel>取消</button>
+            <button class="btn pri" data-save>更改密碼</button>`
+  });
+  const R = m.ov;
+  setTimeout(()=>$('#p-old', R).focus(), 60);
+  $('[data-cancel]', R).onclick = m.close;
+  $('[data-save]', R).onclick = async ()=>{
+    const oldPw = $('#p-old', R).value, np = $('#p-new', R).value, np2 = $('#p-new2', R).value;
+    const btn = $('[data-save]', R);
+    if(!oldPw){ showFormErr(R, '請輸入目前的密碼。'); return; }
+    if(np.length < 6){ showFormErr(R, '新密碼至少 6 個字元。'); return; }
+    if(np !== np2){ showFormErr(R, '兩次輸入的新密碼不一樣。'); return; }
+    if(np === oldPw){ showFormErr(R, '新密碼不能跟目前的一樣。'); return; }
+    btn.disabled = true; btn.textContent = '處理中…';
+    try{
+      // 先用目前密碼確認是本人，避免手機被別人拿去直接改掉
+      const chk = await sb.auth.signInWithPassword({ email: session.user.email, password: oldPw });
+      if(chk.error) throw new Error('CURRENT');
+      const { error } = await sb.auth.updateUser({ password: np });
+      if(error) throw error;
+      m.close();
+      toast('密碼已更改');
+    }catch(e){
+      const msg = String(e?.message||e);
+      showFormErr(R, msg === 'CURRENT' ? '目前密碼不正確。'
+        : /should be different|same as/i.test(msg) ? '新密碼不能跟舊的一樣。'
+        : /rate limit|too many/i.test(msg) ? '嘗試太頻繁，請等幾分鐘再試。' : msg);
+      btn.disabled = false; btn.textContent = '更改密碼';
+    }
+  };
+}
+
 function exportJSON(){
   const data = { exported_at:new Date().toISOString(), email:session?.user?.email,
     schedules:state.schedules, events:state.events,
@@ -1998,8 +2075,9 @@ function render(){
 /* ============================================================
    啟動
    ============================================================ */
+let recovering = false;      // 正在走「從重設信進來設新密碼」的流程
 function show(id){
-  ['#scr-setup','#scr-auth','#scr-app'].forEach(s=>$(s).classList.add('hide'));
+  ['#scr-setup','#scr-auth','#scr-reset','#scr-app'].forEach(s=>$(s).classList.add('hide'));
   $(id).classList.remove('hide');
   document.body.classList.toggle('app-on', id==='#scr-app');
 }
@@ -2033,33 +2111,57 @@ function initSetupScreen(){
   };
 }
 
+const appUrl = () => location.origin + location.pathname;
+
 function initAuthScreen(){
   show('#scr-auth');
-  let mode = 'in';
+  let mode = 'in';                       // in / up / forgot
   const setMode = m=>{
     mode = m;
+    const forgot = m === 'forgot';
+    $('#au-tabs').classList.toggle('hide', forgot);
+    $('#au-pw-fld').classList.toggle('hide', forgot);
+    $('#au-forgot').classList.toggle('hide', m !== 'in');
+    $('#au-back').classList.toggle('hide', !forgot);
     $('#tab-in').classList.toggle('on', m==='in');
     $('#tab-up').classList.toggle('on', m==='up');
-    $('#au-go').textContent = m==='in' ? '登入' : '建立帳號';
+    $('#au-go').textContent = forgot ? '寄送重設信' : (m==='in' ? '登入' : '建立帳號');
     $('#au-pw').setAttribute('autocomplete', m==='in' ? 'current-password' : 'new-password');
-    $('#au-hint').textContent = m==='in'
-      ? '登入狀態會記住，之後開啟不需重新登入。'
+    $('#au-hint').textContent =
+        forgot ? '我們會寄一封信到這個 Email，點信裡的連結就能設定新密碼。'
+      : m==='in' ? '登入狀態會記住，之後開啟不需重新登入。'
       : '用同一組 Email 與密碼，就能在手機與電腦看到同一份資料。';
     $('#au-err').classList.add('hide'); $('#au-ok').classList.add('hide');
   };
-  $('#tab-in').onclick = ()=>setMode('in');
-  $('#tab-up').onclick = ()=>setMode('up');
+  $('#tab-in').onclick    = ()=>setMode('in');
+  $('#tab-up').onclick    = ()=>setMode('up');
+  $('#au-forgot').onclick = ()=>setMode('forgot');
+  $('#au-back').onclick   = ()=>setMode('in');
 
   $('#au-form').onsubmit = async ev=>{
     ev.preventDefault();
     const email = $('#au-email').value.trim();
     const pw = $('#au-pw').value;
     const err = $('#au-err'), ok = $('#au-ok'), btn = $('#au-go');
+    const label = btn.textContent;
     err.classList.add('hide'); ok.classList.add('hide');
-    if(!email || !pw){ err.textContent='請填寫 Email 與密碼。'; err.classList.remove('hide'); return; }
+    if(!email){ err.textContent='請填寫 Email。'; err.classList.remove('hide'); return; }
+    if(mode!=='forgot' && !pw){ err.textContent='請填寫密碼。'; err.classList.remove('hide'); return; }
     if(mode==='up' && pw.length < 6){ err.textContent='密碼至少 6 個字元。'; err.classList.remove('hide'); return; }
     btn.disabled = true; btn.textContent = '處理中…';
     try{
+      if(mode==='forgot'){
+        const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: appUrl() });
+        if(error) throw error;
+        ok.innerHTML = `重設信已寄到 <b>${esc(email)}</b>。<br>
+          點信裡的連結就會回到這個頁面設定新密碼；連結有時效，過期就再寄一次。<br>
+          沒收到的話看一下垃圾郵件。`;
+        ok.classList.remove('hide');
+        setMode('in');
+        $('#au-ok').classList.remove('hide');
+        btn.disabled = false; btn.textContent = '登入';
+        return;
+      }
       if(mode==='in'){
         const { error } = await sb.auth.signInWithPassword({ email, password: pw });
         if(error) throw error;
@@ -2070,6 +2172,7 @@ function initAuthScreen(){
           ok.textContent = '帳號已建立。請到信箱點擊確認信中的連結，再回來登入。';
           ok.classList.remove('hide');
           setMode('in');
+          $('#au-ok').classList.remove('hide');
           btn.disabled = false; btn.textContent = '登入';
           return;
         }
@@ -2079,12 +2182,43 @@ function initAuthScreen(){
       err.textContent = /Invalid login/i.test(msg) ? 'Email 或密碼不正確。'
         : /already registered/i.test(msg) ? '這個 Email 已經註冊過了，請直接登入。'
         : /Email not confirmed/i.test(msg) ? '請先到信箱點擊確認信中的連結。'
+        : /rate limit|too many/i.test(msg) ? '嘗試太頻繁，請等幾分鐘再試。'
         : msg;
       err.classList.remove('hide');
-      btn.disabled = false; btn.textContent = mode==='in' ? '登入' : '建立帳號';
+      btn.disabled = false; btn.textContent = label;
     }
   };
   setMode('in');
+}
+
+/* ---------- 從重設信連結進來：設定新密碼 ---------- */
+function initResetScreen(){
+  show('#scr-reset');
+  const who = session?.user?.email;
+  if(who) $('#rs-who').textContent = `為 ${who} 設定新密碼`;
+  $('#rs-form').onsubmit = async ev=>{
+    ev.preventDefault();
+    const pw = $('#rs-pw').value, pw2 = $('#rs-pw2').value;
+    const err = $('#rs-err'), btn = $('#rs-go');
+    err.classList.add('hide');
+    if(pw.length < 6){ err.textContent='密碼至少 6 個字元。'; err.classList.remove('hide'); return; }
+    if(pw !== pw2){ err.textContent='兩次輸入的密碼不一樣。'; err.classList.remove('hide'); return; }
+    btn.disabled = true; btn.textContent = '設定中…';
+    try{
+      const { error } = await sb.auth.updateUser({ password: pw });
+      if(error) throw error;
+      recovering = false;
+      startApp();
+      toast('密碼已更新');
+    }catch(e){
+      const msg = String(e?.message||e);
+      err.textContent = /should be different|same as/i.test(msg) ? '新密碼不能跟舊的一樣。'
+        : /expired|invalid/i.test(msg) ? '這個重設連結已失效，請回登入頁重新寄一次。'
+        : msg;
+      err.classList.remove('hide');
+      btn.disabled = false; btn.textContent = '設定新密碼';
+    }
+  };
 }
 
 async function startApp(){
@@ -2195,20 +2329,44 @@ const DEMO_SESSION = { user:{ id:'demo-user', email:'試用模式（僅存在本
     $('#au-err').classList.remove('hide');
     return;
   }
+  // detectSessionInUrl 要開著，重設密碼的信件連結才會被接住
   sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
-    auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:false }
+    auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true }
   });
-  const { data } = await sb.auth.getSession();
-  session = data?.session || null;
+
+  // 連結本身就帶錯誤（例如已過期）
+  const hash = new URLSearchParams(location.hash.replace(/^#/,''));
+  const linkErr = hash.get('error_description') || hash.get('error');
+  const isRecovery = hash.get('type') === 'recovery';
+  if(linkErr) history.replaceState(null, '', appUrl());
 
   sb.auth.onAuthStateChange((evt, s)=>{
     const had = !!session;
     session = s;
+    if(evt === 'PASSWORD_RECOVERY'){
+      recovering = true;
+      history.replaceState(null, '', appUrl());
+      initResetScreen();
+      return;
+    }
+    if(recovering) return;                 // 設新密碼期間不要被其他事件帶走
     if(!had && s){ startApp(); }
     if(had && !s){ location.reload(); }
   });
 
-  if(session) startApp(); else initAuthScreen();
+  const { data } = await sb.auth.getSession();
+  session = data?.session || null;
+
+  if(recovering) return;                   // PASSWORD_RECOVERY 已經接手
+  if(isRecovery && session){ recovering = true; history.replaceState(null,'',appUrl()); initResetScreen(); return; }
+  if(session){ startApp(); return; }
+
+  initAuthScreen();
+  if(linkErr){
+    $('#au-err').textContent = /expired/i.test(linkErr)
+      ? '這個連結已過期，請重新點「忘記密碼？」寄一次。' : decodeURIComponent(linkErr);
+    $('#au-err').classList.remove('hide');
+  }
 })();
 
 /* iOS Safari 分頁模式不理會 user-scalable=no，直接擋掉捏合手勢 */
