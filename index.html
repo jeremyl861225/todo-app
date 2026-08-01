@@ -1400,6 +1400,7 @@ function openMenu(){
     <div class="who"><b>${esc(session?.user?.email||'')}</b><span>已登入，資料自動同步</span></div>
     <button data-a="cats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0l-7-7A2 2 0 0 1 3 12.2V5a2 2 0 0 1 2-2h7.2a2 2 0 0 1 1.4.6l7 7a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor"/></svg>管理類別</button>
     <button data-a="sync"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.5M4 13a8 8 0 0 0 14.3 4.5"/><path d="M20 4v4h-4M4 20v-4h4"/></svg>立即重新同步</button>
+    <button data-a="import"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M8 7l4-4 4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>匯入 JSON</button>
     <button data-a="export"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>匯出備份 JSON</button>
     <button data-a="out" class="dg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17l5-5-5-5M20 12H9M11 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5"/></svg>登出</button>`;
   document.body.appendChild(menuEl);
@@ -1407,6 +1408,7 @@ function openMenu(){
 
   menuEl.querySelector('[data-a=cats]').onclick   = ()=>{ closeMenu(); openCatManager(); };
   menuEl.querySelector('[data-a=sync]').onclick   = async ()=>{ closeMenu(); await flushQueue(); await pullAll(); toast('已重新同步'); };
+  menuEl.querySelector('[data-a=import]').onclick = ()=>{ closeMenu(); openImportMenu(); };
   menuEl.querySelector('[data-a=export]').onclick = ()=>{ closeMenu(); exportJSON(); };
   menuEl.querySelector('[data-a=out]').onclick    = async ()=>{
     closeMenu();
@@ -1415,6 +1417,154 @@ function openMenu(){
     location.reload();
   };
 }
+/* ---------- 匯入 ---------- */
+function normLinks(v){
+  return Array.isArray(v) ? v.filter(l=>l && l.url)
+    .map(l=>({ name:String(l.name||l.url), url:normUrl(l.url) })) : [];
+}
+function normSchedule(s){
+  const freq = ['daily','weekly','biweekly','monthly'].includes(s.freq) ? s.freq : null;
+  const title = String(s.title||'').trim();
+  if(!title || !freq) return null;
+  return {
+    id: s.id || uid(),
+    title,
+    description: String(s.description||''),
+    freq,
+    weekday:   (freq==='weekly'||freq==='biweekly') ? (Number(s.weekday)||0) : null,
+    month_day: freq==='monthly' ? Math.min(31, Math.max(1, Number(s.month_day)||1)) : null,
+    anchor_date: freq==='biweekly' ? (s.anchor_date || null) : null,
+    start_date: s.start_date || null,
+    time_text: String(s.time_text||''),
+    category: String(s.category||''),
+    links: normLinks(s.links)
+  };
+}
+function normEvent(e){
+  const title = String(e.title||'').trim();
+  if(!title || !/^\d{4}-\d{2}-\d{2}$/.test(String(e.date||''))) return null;
+  return {
+    id: e.id || uid(), title, date: e.date,
+    description: String(e.description||''),
+    time_text: String(e.time_text||''),
+    category: String(e.category||''),
+    links: normLinks(e.links)
+  };
+}
+function parseImport(data){
+  if(!data || typeof data !== 'object') return null;
+  const sch = (Array.isArray(data.schedules) ? data.schedules : []).map(normSchedule).filter(Boolean);
+  const evt = (Array.isArray(data.events) ? data.events : []).map(normEvent).filter(Boolean);
+  const cat = (Array.isArray(data.categories) ? data.categories : [])
+    .map(c=>String(c && c.name || '').trim()).filter(Boolean);
+  for(const s of sch) if(s.category && !cat.includes(s.category)) cat.push(s.category);
+  for(const e of evt) if(e.category && !cat.includes(e.category)) cat.push(e.category);
+  if(!sch.length && !evt.length) return null;
+  return { schedules:sch, events:evt, categories:cat, source:String(data.source||'') };
+}
+function applyImport(p){
+  let newCat = 0;
+  for(const n of p.categories){
+    if(!state.categories.some(c=>c.name===n)){ addCategory(n); newCat++; }
+  }
+  let addS=0, updS=0, addE=0, updE=0;
+  for(const s of p.schedules){
+    (state.schedules.some(x=>x.id===s.id) ? (updS++) : (addS++));
+    saveSchedule(s);
+  }
+  for(const e of p.events){
+    (state.events.some(x=>x.id===e.id) ? (updE++) : (addE++));
+    saveEvent(e);
+  }
+  render();
+  const bits = [];
+  if(addS) bits.push(`新增 ${addS} 筆排程`);
+  if(updS) bits.push(`更新 ${updS} 筆排程`);
+  if(addE) bits.push(`新增 ${addE} 筆行程`);
+  if(updE) bits.push(`更新 ${updE} 筆行程`);
+  if(newCat) bits.push(`新增 ${newCat} 個類別`);
+  toast(bits.length ? '匯入完成：' + bits.join('、') : '沒有任何變更');
+}
+function openImportPreview(p, label){
+  const rows = p.schedules.map(s=>
+    `<div class="drow"><span class="tag time">${esc(whenLabel(s))}</span>
+       <span class="dmain" style="cursor:default"><span class="dt">${esc(s.title)}</span></span></div>`
+  ).join('') + p.events.map(e=>
+    `<div class="drow"><span class="tag time">${esc(fmtDate(e.date))}</span>
+       <span class="dmain" style="cursor:default"><span class="dt">${esc(e.title)}</span></span></div>`
+  ).join('');
+  const dupe = p.schedules.filter(s=>state.schedules.some(x=>x.id===s.id)).length
+             + p.events.filter(e=>state.events.some(x=>x.id===e.id)).length;
+  const m = modal({
+    title:'確認匯入',
+    body:`<p class="hint" style="margin:0 0 12px">
+        來源：${esc(label)}${p.source?`<br>${esc(p.source)}`:''}<br>
+        共 <b>${p.schedules.length}</b> 筆重複排程、<b>${p.events.length}</b> 筆單一行程、
+        <b>${p.categories.length}</b> 個類別。
+        ${dupe?`其中 <b>${dupe}</b> 筆已存在，會被覆蓋成檔案裡的版本。`:'不會覆蓋你現有的資料。'}
+      </p>
+      <div style="display:flex;flex-direction:column;gap:6px">${rows}</div>`,
+    footer:`<span class="sp"></span><button class="btn" data-cancel>取消</button>
+            <button class="btn pri" data-go>確定匯入</button>`
+  });
+  $('[data-cancel]', m.ov).onclick = m.close;
+  $('[data-go]', m.ov).onclick = ()=>{ m.close(); applyImport(p); };
+}
+function importFromData(data, label){
+  const p = parseImport(data);
+  if(!p){ toast('這個檔案裡沒有可匯入的排程或行程', true); return; }
+  openImportPreview(p, label);
+}
+function openImportMenu(){
+  const m = modal({
+    title:'匯入 JSON',
+    body:`<p class="hint" style="margin:0 0 14px">
+        可匯入本程式「匯出備份 JSON」產生的檔案，或已轉好格式的排程檔。
+        相同項目會依內部編號覆蓋，重複匯入不會產生重複資料。
+      </p>
+      <div id="imp-built" style="display:flex;flex-direction:column;gap:6px;margin:0 0 14px"></div>
+      <button class="btn wide" data-file>從檔案選擇…</button>`,
+    footer:`<span class="sp"></span><button class="btn" data-x2>關閉</button>`
+  });
+  const R = m.ov;
+  $('[data-x2]', R).onclick = m.close;
+  $('[data-file]', R).onclick = ()=>{
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = '.json,application/json';
+    inp.onchange = async ()=>{
+      const f = inp.files && inp.files[0];
+      if(!f) return;
+      let data;
+      try{ data = JSON.parse(await f.text()); }
+      catch(e){ toast('這個檔案不是有效的 JSON', true); return; }
+      m.close();
+      importFromData(data, f.name);
+    };
+    inp.click();
+  };
+  // 隨程式附的現成排程檔
+  fetch('imports/index.json').then(r=>r.ok?r.json():null).then(list=>{
+    if(!Array.isArray(list) || !list.length) return;
+    const box = $('#imp-built', R);
+    if(!box) return;
+    box.innerHTML = list.map((it,i)=>
+      `<button class="btn wide" data-b="${i}" style="justify-content:flex-start;height:auto;padding:11px 14px;text-align:left">
+        <span style="display:block">
+          <span style="display:block;font-size:14.5px">${esc(it.title)}</span>
+          <span style="display:block;font-size:12px;color:var(--muted);font-weight:400;margin-top:2px">${esc(it.description||'')}</span>
+        </span>
+      </button>`).join('');
+    $$('[data-b]', box).forEach(b=>b.onclick = async ()=>{
+      const it = list[Number(b.dataset.b)];
+      try{
+        const data = await fetch('imports/' + it.file).then(r=>r.json());
+        m.close();
+        importFromData(data, it.title);
+      }catch(e){ toast('讀取失敗：' + (e.message||e), true); }
+    });
+  }).catch(()=>{});
+}
+
 function exportJSON(){
   const data = { exported_at:new Date().toISOString(), email:session?.user?.email,
     schedules:state.schedules, events:state.events,
