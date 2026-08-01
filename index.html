@@ -123,6 +123,35 @@ main{padding:20px 0 40px}
 .tag.time{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
 .tag .cd{width:7px;height:7px;border-radius:50%;flex:none}
 .tag.lk{background:#EFEAF0;color:#5B4B62}
+/* ---------- 重大事件 ---------- */
+.star{color:var(--hot);flex:none;display:inline-block;vertical-align:-1px}
+.item .ti .star{margin-right:5px}
+.item.imp{box-shadow:var(--sh-1), inset 0 0 0 1.5px rgba(176,96,58,.32)}
+.item.imp:hover{box-shadow:var(--sh-2), inset 0 0 0 1.5px rgba(176,96,58,.45)}
+.tag.imp{background:var(--hot-soft);color:#7E432A;font-weight:600}
+.cchip .star{margin-right:2px;font-size:9px}
+.dots i.imp{box-shadow:0 0 0 1.5px var(--hot)}
+.dots i.imp.done{box-shadow:0 0 0 1.5px var(--hot), inset 0 0 0 1px currentColor}
+.drow.imp{border-color:rgba(176,96,58,.34)}
+.dt .star{margin-right:4px}
+/* 表單裡的開關 */
+.impbtn{display:flex;align-items:center;gap:11px;width:100%;text-align:left;
+  padding:11px 13px;border-radius:var(--r-md);border:1px solid var(--line);
+  background:var(--card2);transition:background .15s,border-color .15s}
+.impbtn:hover{background:var(--bg2)}
+.impbtn[aria-pressed="true"]{background:var(--hot-soft);border-color:#E6CDBF}
+.impbtn .bigstar{font-size:19px;color:var(--line);transition:color .15s;flex:none;line-height:1}
+.impbtn[aria-pressed="true"] .bigstar{color:var(--hot)}
+.impbtn .tx{flex:1;min-width:0}
+.impbtn .tx b{display:block;font-size:14.5px;font-weight:600;color:var(--ink)}
+.impbtn .tx small{display:block;font-size:12px;color:var(--muted);margin-top:1px;line-height:1.45}
+.sw{width:42px;height:24px;border-radius:999px;background:var(--line);flex:none;
+  position:relative;transition:background .18s}
+.sw i{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 3px rgba(70,58,40,.28);transition:transform .18s}
+.impbtn[aria-pressed="true"] .sw{background:var(--hot)}
+.impbtn[aria-pressed="true"] .sw i{transform:translateX(18px)}
+
 .tag.over{background:#EDE9E1;color:#8A8172}
 .tag.soon{background:var(--hot-soft);color:#7E432A}
 .item.ended{opacity:.62}
@@ -609,6 +638,7 @@ const diffDays = (a,b) => Math.round((parseYmd(a) - parseYmd(b))/86400000);
 const addDays = (s,n) => { const d=parseYmd(s); d.setDate(d.getDate()+n); return ymd(d); };
 const fmtDate = s => { const d=parseYmd(s); return `${d.getMonth()+1} 月 ${d.getDate()} 日`; };
 
+const STAR = '<span class="star" aria-label="重大事件">★</span>';
 function hexRgba(hex, a){
   const h = String(hex||'').replace('#','');
   const n = h.length === 3 ? h.split('').map(c=>c+c).join('') : h;
@@ -767,7 +797,7 @@ const state = {
   schedules:[], events:[], completions:[], categories:[],
   doneIndex:new Map(),
   page:'list', calY:0, calM:0, selDate: todayStr(),
-  filter:null, loaded:false, online:navigator.onLine
+  filter:null, impOnly:false, loaded:false, online:navigator.onLine
 };
 const queue = [];   // 待上傳操作
 let flushing = false;
@@ -863,18 +893,29 @@ async function flushQueue(){
 /* ---------- 資料表版本檢查 ----------
    起訖日與「自訂」頻率需要新欄位；沒升級就會寫入失敗，先擋在前面提醒。 */
 let schemaReady = true;
+const MIGRATIONS = [
+  { file:'2026-08-recurrence.sql',
+    checks:[['schedules','end_date,interval_n,custom_unit'], ['events','end_date']] },
+  { file:'2026-08-important.sql',
+    checks:[['schedules','important'], ['events','important']] }
+];
 async function checkSchema(){
   if(!sb || !session) return;
-  const a = await sb.from('schedules').select('end_date,interval_n,custom_unit').limit(1);
-  const b = await sb.from('events').select('end_date').limit(1);
-  const err = a.error || b.error;
-  if(!err) return;
-  if(!/column|does not exist|schema/i.test(String(err.message||''))) return;
+  const missing = [];
+  for(const m of MIGRATIONS){
+    for(const [t, cols] of m.checks){
+      const r = await sb.from(t).select(cols).limit(1);
+      if(r.error && /column|does not exist|schema/i.test(String(r.error.message||''))){
+        missing.push(m.file); break;
+      }
+    }
+  }
+  if(!missing.length) return;
   schemaReady = false;
   const bar = document.createElement('div');
   bar.className = 'schemabar';
   bar.innerHTML = `<b>資料表需要升級</b>
-    請到 Supabase → SQL Editor 執行 <code>migrations/2026-08-recurrence.sql</code>，
+    請到 Supabase → SQL Editor 依序執行 ${missing.map(f=>`<code>migrations/${f}</code>`).join('、')}，
     否則新增／修改排程會存不起來。執行完重新整理這個頁面即可。`;
   document.querySelector('#scr-app').prepend(bar);
 }
@@ -982,14 +1023,20 @@ function renderFilters(){
   const cats = state.categories.map(c=>c.name);
   const used = new Set(state.schedules.map(s=>s.category).filter(Boolean));
   for(const u of used) if(!cats.includes(u)) cats.push(u);
-  if(!cats.length){ box.classList.add('hide'); box.innerHTML=''; return; }
+  const anyImp = state.schedules.some(s=>s.important);
+  if(!cats.length && !anyImp){ box.classList.add('hide'); box.innerHTML=''; return; }
   box.classList.remove('hide');
-  box.innerHTML = `<button class="chip ${state.filter===null?'on':''}" data-c="">全部</button>` +
+  box.innerHTML = `<button class="chip ${(state.filter===null && !state.impOnly)?'on':''}" data-c="">全部</button>` +
+    (anyImp?`<button class="chip ${state.impOnly?'on':''}" data-imp="1">★ 重大</button>`:'') +
     cats.map(c=>`<button class="chip ${state.filter===c?'on':''}" data-c="${esc(c)}">
       <i class="cd" style="background:${catColor(c)}"></i>${esc(c)}</button>`).join('');
   $$('.chip', box).forEach(b=>b.onclick = ()=>{
-    const v = b.dataset.c;
-    state.filter = (!v || state.filter===v) ? null : v;
+    if(b.dataset.imp){ state.impOnly = !state.impOnly; }
+    else {
+      const v = b.dataset.c;
+      if(!v){ state.filter = null; state.impOnly = false; }
+      else   { state.filter = state.filter===v ? null : v; }
+    }
     renderList(); renderFilters();
   });
 }
@@ -999,10 +1046,10 @@ function itemCardHTML(s){
   const today = todayStr();
   const ended   = s.end_date && s.end_date < today;
   const pending = s.start_date && s.start_date > today;
-  return `<button class="item ${ended?'ended':''}" data-id="${esc(s.id)}">
+  return `<button class="item ${ended?'ended':''} ${s.important?'imp':''}" data-id="${esc(s.id)}">
     <span class="bar" style="background:${catColor(s.category)}"></span>
     <span class="bd">
-      <span class="ti">${esc(s.title)}</span>
+      <span class="ti">${s.important?STAR:''}${esc(s.title)}</span>
       <span class="mt">
         <span class="tag time">${esc(whenLabel(s))}${s.time_text?' · '+esc(s.time_text):''}</span>
         ${ended?`<span class="tag over">已結束 ${esc(fmtDate(s.end_date))}</span>`
@@ -1019,17 +1066,23 @@ function itemCardHTML(s){
 function renderList(){
   const body = $('#list-body');
   let rows = state.schedules.slice();
-  if(state.filter) rows = rows.filter(s=>s.category===state.filter);
+  if(state.filter)  rows = rows.filter(s=>s.category===state.filter);
+  if(state.impOnly) rows = rows.filter(s=>s.important);
 
   if(!rows.length){
-    body.innerHTML = `<div class="empty"><b>${state.filter?'這個類別還沒有排程':'還沒有任何重複排程'}</b>
-      ${state.filter?'換一個類別看看，或新增一筆。':'點右下角「新增排程」，建立每日／每週／每月或自訂間隔要做的事。'}</div>`;
+    const narrowed = state.filter || state.impOnly;
+    body.innerHTML = `<div class="empty"><b>${
+      state.impOnly ? '沒有符合的重大事件'
+      : state.filter ? '這個類別還沒有排程' : '還沒有任何重複排程'}</b>
+      ${narrowed ? '換一個條件看看，或新增一筆。'
+        : '點右下角「新增排程」，建立每日／每週／每月或自訂間隔要做的事。'}</div>`;
     return;
   }
   const groupOf = s => s.freq === 'biweekly' ? 'custom' : s.freq;   // 舊資料歸到「自訂」
   let html = '';
   for(const f of FREQS){
     const g = rows.filter(s=>groupOf(s)===f.k).sort((a,b)=>{
+      if(!!a.important !== !!b.important) return a.important ? -1 : 1;   // 重大事件排前面
       if(f.k==='weekly'){
         const d = (Number(a.weekday)||0)-(Number(b.weekday)||0); if(d) return d;
       }
@@ -1078,19 +1131,21 @@ function renderCal(){
       const done = isDone(it.row.id, ds);
       const col = catColor(it.row.category);
       const ev = it.kind === 'event' ? ' evt' : '';
-      return `<i class="${done?'done':''}${ev}" style="${done?`color:${col}`:`background:${col}`}"></i>`;
+      const im = it.row.important ? ' imp' : '';
+      return `<i class="${done?'done':''}${ev}${im}" style="${done?`color:${col}`:`background:${col}`}"></i>`;
     }).join('');
     const chips = items.slice(0,3).map(it=>{
       const done = isDone(it.row.id, ds);
       const col = catColor(it.row.category);
+      const st = it.row.important ? STAR : '';
       const t = (it.row.time_text?it.row.time_text+' ':'') + it.row.title;
       if(it.kind !== 'event'){
-        return `<span class="cchip ${done?'done':''}" style="border-left-color:${col}">${esc(t)}</span>`;
+        return `<span class="cchip ${done?'done':''}" style="border-left-color:${col}">${st}${esc(t)}</span>`;
       }
       const cont = it.span > 1 ? ` ${it.first?'st':''}${it.last?'en':''}${!it.first&&!it.last?'mid':''}` : '';
       const style = `--c:${col};--c-soft:${hexRgba(col,.15)};--c-line:${hexRgba(col,.42)}`;
       return `<span class="cchip evt${cont} ${done?'done':''}" style="${style}">${
-        it.span>1 && !it.first ? '<b class="cnt">▸</b>' : ''}${esc(t)}</span>`;
+        it.span>1 && !it.first ? '<b class="cnt">▸</b>' : ''}${st}${esc(t)}</span>`;
     }).join('');
     const more = items.length>3 ? `<span class="cmore">+${items.length-3}</span>` : '';
     cells.push(`<button class="cell ${out?'out':''} ${ds===today?'today':''} ${ds===state.selDate?'sel':''}" data-d="${ds}">
@@ -1135,12 +1190,12 @@ function renderDay(){
     const kindTag = ev
       ? `<span class="tag ev">${it.span>1?`多日行程 第 ${it.dayIndex}/${it.span} 天`:'單一行程'}</span>`
       : `<span class="tag">${esc(whenLabel(r))}</span>`;
-    return `<div class="drow ${ev?'evt':''} ${dn?'done':''}" data-id="${esc(r.id)}" data-k="${it.kind}" style="${style}">
+    return `<div class="drow ${ev?'evt':''} ${r.important?'imp':''} ${dn?'done':''}" data-id="${esc(r.id)}" data-k="${it.kind}" style="${style}">
       <button class="ck ${dn?'on':''}" data-act="ck" aria-label="標記完成">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>
       </button>
       <button class="dmain" data-act="open">
-        <span class="dt">${esc(r.title)}</span>
+        <span class="dt">${r.important?STAR:''}${esc(r.title)}</span>
         <span class="dsub">
           ${r.time_text?`<span class="tag time">${esc(r.time_text)}</span>`:''}
           ${kindTag}
@@ -1225,6 +1280,7 @@ function openDetail({kind, row, mode, date}){
   const rl = isEvt ? '' : rangeLabel(row);
 
   let body = `<div class="dv-badges">
+    ${row.important?`<span class="tag imp">★ 重大事件</span>`:''}
     <span class="tag time">${esc(when)}${row.time_text?' · '+esc(row.time_text):''}</span>
     ${rl?`<span class="tag">${esc(rl)}</span>`:''}
     ${row.category?`<span class="tag"><i class="cd" style="background:${col}"></i>${esc(row.category)}</span>`:''}
@@ -1270,7 +1326,7 @@ function openDetail({kind, row, mode, date}){
     body += `<p class="dv-note">重複排程的內容請至「重複排程」頁修改。</p>`;
   }
 
-  const m = modal({ title: esc(row.title), body, footer });
+  const m = modal({ title: (row.important?STAR+' ':'') + esc(row.title), body, footer });
 
   const ck = $('#dv-ck', m.ov);
   if(ck) ck.onclick = ()=>{
@@ -1296,6 +1352,20 @@ function openDetail({kind, row, mode, date}){
 /* ============================================================
    共用表單片段
    ============================================================ */
+function impToggleHTML(on){
+  return `<div class="fld">
+    <button type="button" class="impbtn" id="f-imp" aria-pressed="${on?'true':'false'}">
+      <span class="bigstar">★</span>
+      <span class="tx"><b>標記為重大事件</b><small>清單置頂並加上星號，月曆上也會標示出來</small></span>
+      <span class="sw"><i></i></span>
+    </button></div>`;
+}
+function wireImp(root){
+  const b = $('#f-imp', root);
+  b.onclick = ()=> b.setAttribute('aria-pressed', b.getAttribute('aria-pressed')==='true' ? 'false' : 'true');
+}
+const impValue = root => $('#f-imp', root).getAttribute('aria-pressed') === 'true';
+
 function catSelectHTML(cur){
   const names = state.categories.map(c=>c.name);
   if(cur && !names.includes(cur)) names.push(cur);
@@ -1374,7 +1444,7 @@ function openScheduleForm(existing){
     id:uid(), title:'', description:'', freq:'weekly',
     weekday:new Date().getDay(), month_day:new Date().getDate(),
     start_date:today, end_date:null, interval_n:2, custom_unit:'week',
-    time_text:'', category:'', links:[]
+    time_text:'', category:'', important:false, links:[]
   };
   // 既有排程沒填起始日時，用建立日期回填，才不會把過去的紀錄藏起來
   const startInit = s.start_date || s.anchor_date
@@ -1416,6 +1486,7 @@ function openScheduleForm(existing){
     <div class="fld"><label for="f-time">時間（選填）</label>
       <input id="f-time" class="inp" value="${esc(s.time_text||'')}" placeholder="例：08:00、晨會後" maxlength="40"></div>
     <div class="fld"><label for="f-cat">類別</label>${catSelectHTML(s.category)}</div>
+    ${impToggleHTML(s.important)}
     <div class="fld"><label for="f-desc">敘述（選填）</label>
       <textarea id="f-desc" class="inp" placeholder="這件事要做什麼、注意事項…">${esc(s.description||'')}</textarea></div>
     <div class="fld"><label>相關連結（選填）</label>${linksHTML(s.links)}</div>`;
@@ -1443,7 +1514,7 @@ function openScheduleForm(existing){
     $$('#f-wd button', R).forEach(x=>x.classList.toggle('on', x===b));
   });
   syncFreqUI();
-  wireLinks(R); wireCat(R);
+  wireLinks(R); wireCat(R); wireImp(R);
   setTimeout(()=>{ if(!existing) $('#f-title', R).focus(); }, 60);
 
   $('[data-cancel]', R).onclick = m.close;
@@ -1472,6 +1543,7 @@ function openScheduleForm(existing){
       end_date: end,
       time_text: $('#f-time', R).value.trim(),
       category: ($('#f-cat', R).value === '__new__' ? '' : $('#f-cat', R).value),
+      important: impValue(R),
       links: readLinks(R)
     };
     saveSchedule(row);
@@ -1486,7 +1558,7 @@ function openScheduleForm(existing){
 function openEventForm(existing, presetDate){
   const e = existing || {
     id:uid(), title:'', description:'', date: presetDate || state.selDate,
-    end_date:null, time_text:'', category:'', links:[]
+    end_date:null, time_text:'', category:'', important:false, links:[]
   };
   const body = `
     <div id="f-err" class="err hide"></div>
@@ -1500,6 +1572,7 @@ function openEventForm(existing, presetDate){
     <div class="fld"><label for="f-time">時間（選填）</label>
       <input id="f-time" class="inp" value="${esc(e.time_text||'')}" placeholder="例：14:00" maxlength="40"></div>
     <div class="fld"><label for="f-cat">類別</label>${catSelectHTML(e.category)}</div>
+    ${impToggleHTML(e.important)}
     <div class="fld"><label for="f-desc">敘述（選填）</label>
       <textarea id="f-desc" class="inp">${esc(e.description||'')}</textarea></div>
     <div class="fld"><label>相關連結（選填）</label>${linksHTML(e.links)}</div>`;
@@ -1508,7 +1581,7 @@ function openEventForm(existing, presetDate){
                   <button class="btn pri" data-save>${existing?'儲存變更':'新增行程'}</button>`;
   const m = modal({ title: existing?'編輯單一行程':'新增單一行程', body, footer });
   const R = m.ov;
-  wireLinks(R); wireCat(R);
+  wireLinks(R); wireCat(R); wireImp(R);
   setTimeout(()=>{ if(!existing) $('#f-title', R).focus(); }, 60);
 
   const showSpan = ()=>{
@@ -1536,6 +1609,7 @@ function openEventForm(existing, presetDate){
       description: $('#f-desc', R).value.trim(),
       time_text: $('#f-time', R).value.trim(),
       category: ($('#f-cat', R).value === '__new__' ? '' : $('#f-cat', R).value),
+      important: impValue(R),
       links: readLinks(R)
     };
     saveEvent(row);
@@ -1647,6 +1721,7 @@ function normSchedule(s){
     end_date: end,
     time_text: String(s.time_text||''),
     category: String(s.category||''),
+    important: !!s.important,
     links: normLinks(s.links)
   };
 }
@@ -1659,6 +1734,7 @@ function normEvent(e){
     description: String(e.description||''),
     time_text: String(e.time_text||''),
     category: String(e.category||''),
+    important: !!e.important,
     links: normLinks(e.links)
   };
 }

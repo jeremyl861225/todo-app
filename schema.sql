@@ -32,6 +32,7 @@ create table if not exists public.schedules (
   end_date    date,         -- 結束日（選填，null = 持續進行）
   time_text   text default '',
   category    text default '',
+  important   boolean not null default false,   -- 重大事件
   links       jsonb not null default '[]'::jsonb,
   created_at  timestamptz not null default now(),
   constraint schedules_range_check
@@ -48,6 +49,7 @@ create table if not exists public.events (
   end_date    date,            -- 結束日（選填，null = 單日；跨多日活動用）
   time_text   text default '',
   category    text default '',
+  important   boolean not null default false,   -- 重大事件
   links       jsonb not null default '[]'::jsonb,
   created_at  timestamptz not null default now(),
   constraint events_range_check check (end_date is null or end_date >= date)
