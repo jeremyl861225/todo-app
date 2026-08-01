@@ -14,13 +14,12 @@
 已完成：Supabase 專案 `dawcpdgonxmhojwonkut` 建立、四張資料表與 RLS 建好、
 金鑰已填進 `index.html`、部署到 GitHub Pages。
 
-還沒做的兩件事：
+還沒做的一件事：
 
-1. **註冊帳號**。第一次開網頁點「註冊」，用你的 Email 和一組密碼建立帳號。
-   目前 Supabase 的 **Confirm email 仍是開啟的**，所以註冊後要去信箱點確認信才能登入。
-   想省掉這一步，到 Supabase → Authentication → Sign In / Providers → Email →
-   把 **Confirm email** 關掉並 Save（詳見下面步驟三）。
-2. **換掉暫用 icon**（見文末「換 icon」）。
+- **註冊帳號**。第一次開網頁點「註冊」，用你的 Email 和一組密碼建立帳號。
+  目前 Supabase 的 **Confirm email 仍是開啟的**，所以註冊後要去信箱點確認信才能登入。
+  想省掉這一步，到 Supabase → Authentication → Sign In / Providers → Email →
+  把 **Confirm email** 關掉並 Save（詳見下面步驟三）。
 
 以下步驟是**重新部署一份**或日後要自己重建時才需要看的紀錄。
 
@@ -110,17 +109,34 @@ const CONFIG = {
 
 ---
 
-## 換 icon
+## icon
 
-現在的 icon 是暫時的（米色勾勾）。要換成你自己的圖，準備 PNG 後直接覆蓋這三個檔：
+目前用的是 `checklist.png`，底色 `#EEEEEE`、黑色線條，比例與 Clinical-Tools、每日文獻一致。
 
-| 檔名 | 尺寸 | 用途 |
-|---|---|---|
-| `icon-180.png` | 180×180 | iPhone 主畫面 |
-| `icon-192.png` | 192×192 | Android／瀏覽器分頁 |
-| `icon-512.png` | 512×512 | Android 啟動畫面 |
+| 檔名 | 尺寸 | 圖案佔比 | 用途 |
+|---|---|---|---|
+| `icon-180.png` | 180×180 | 58.9% | iPhone 主畫面 |
+| `icon-192.png` | 192×192 | 58.3% | Android／瀏覽器分頁 |
+| `icon-512.png` | 512×512 | 58.2% | Android 啟動畫面 |
+| `maskable-512.png` | 512×512 | 36.3% | Android 自動裁形（圓形／方形）用 |
 
-檔名不要改，換完重新整理即可（iPhone 需移除主畫面圖示再重新加入）。
+> 「圖案佔比」是黑色圖形的外框相對於畫布的邊長比。一般 icon 一律 **298/512**（左右各留 107px），
+> maskable 因為系統會裁掉外圈，縮到 **186/512**（左右各留 163px）。這是 Clinical-Tools
+> 與每日文獻沿用的規格，要再換圖時照這個比例縮放就會一致。
+
+日後換圖的做法（來源圖需為 512×512、底色 #EEEEEE、圖案置中）：
+
+```bash
+# 先量出來源圖黑色圖形的外框寬度，設為 INK
+# 一般 icon：整張縮到 512 × (298/INK)，再補白回 512
+sips -z $((512*298/INK)) $((512*298/INK)) checklist.png --out /tmp/m.png
+sips -p 512 512 --padColor EEEEEE /tmp/m.png --out icon-512.png
+sips -z 192 192 icon-512.png --out icon-192.png
+sips -z 180 180 icon-512.png --out icon-180.png
+# maskable：把 298 換成 186 重做一次
+```
+
+換完重新整理即可（iPhone 需移除主畫面圖示再重新加入）。
 
 ---
 
