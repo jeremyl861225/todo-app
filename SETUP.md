@@ -111,7 +111,7 @@ const CONFIG = {
 
 ## icon
 
-目前用的是 `checklist.png`，底色 `#EEEEEE`、黑色線條，比例與 Clinical-Tools、每日文獻一致。
+目前用的是 `task-list.png`，底色 `#EEEEEE`、黑色線條，比例與 Clinical-Tools、每日文獻一致。
 
 | 檔名 | 尺寸 | 圖案佔比 | 用途 |
 |---|---|---|---|
@@ -129,7 +129,7 @@ const CONFIG = {
 ```bash
 # 先量出來源圖黑色圖形的外框寬度，設為 INK
 # 一般 icon：整張縮到 512 × (298/INK)，再補白回 512
-sips -z $((512*298/INK)) $((512*298/INK)) checklist.png --out /tmp/m.png
+sips -z $((512*298/INK)) $((512*298/INK)) task-list.png --out /tmp/m.png
 sips -p 512 512 --padColor EEEEEE /tmp/m.png --out icon-512.png
 sips -z 192 192 icon-512.png --out icon-192.png
 sips -z 180 180 icon-512.png --out icon-180.png
