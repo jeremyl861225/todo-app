@@ -45,7 +45,11 @@
 
 - 單一 `index.html`，無建置流程
 - [Supabase](https://supabase.com) 提供 Email/密碼登入與 Postgres；Row Level Security 確保每個帳號只讀得到自己的資料
-- `sw.js` 刻意**不建立任何快取**：這個 App 需要即時雲端資料，且同網域下還有其他 PWA，不做快取就不會互相影響
+- supabase-js 放在 `vendor/` 而非 CDN，離線與擋外部網域的環境都開得起來
+- `sw.js` 用 stale-while-revalidate 快取 App 外殼：先給快取所以秒開，背景更新，
+  下次開啟就是新版。快取名稱一律 `todo-app-` 前綴、清理時只刪自己的，
+  且只處理 `/todo-app/` 底下的同源 GET，不會影響同網域其他 PWA；
+  Supabase 的 API 永遠走網路，不進快取
 
 ## 自行部署
 

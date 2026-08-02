@@ -12,7 +12,8 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.111.0/dist/umd/supabase.min.js"></script>
+<!-- 放在本機而不是 CDN：離線時開得起來，網路擋外部 CDN 時也不受影響 -->
+<script src="vendor/supabase-2.111.0.min.js"></script>
 <style>
 :root{
   --bg:#F3EDE0; --bg2:#EAE2D1; --card:#FFFCF6; --card2:#FBF6EB;
@@ -1039,7 +1040,8 @@ async function pullAll(){
     const msg = String(err?.message||err||'');
     if(/does not exist|schema/i.test(msg)){
       toast('資料表尚未建立，請先在 Supabase 執行 schema.sql', true);
-    }else{
+    }else if(navigator.onLine){
+      // 離線是正常狀況，右上角的狀態已經說明了，不用再跳錯誤
       toast('連線失敗，顯示的是最後同步的資料', true);
     }
     setSync();
@@ -2425,8 +2427,22 @@ const DEMO_SESSION = { user:{ id:'demo-user', email:'試用模式（僅存在本
   document.addEventListener(t, e=>e.preventDefault(), {passive:false}));
 
 if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+  window.addEventListener('load', async ()=>{
+    try{
+      const reg = await navigator.serviceWorker.register('sw.js');
+      // 背景抓到新版本時提醒一聲；stale-while-revalidate 下次開啟才生效
+      reg.addEventListener('updatefound', ()=>{
+        const sw = reg.installing;
+        if(!sw || !navigator.serviceWorker.controller) return;   // 首次安裝不用提示
+        sw.addEventListener('statechange', ()=>{
+          if(sw.state === 'installed') toast('已下載新版本，下次開啟就會更新');
+        });
+      });
+    }catch(e){}
+  });
 }
+// 讓瀏覽器盡量不要清掉本機資料（裝到主畫面後通常會直接核准）
+if(navigator.storage?.persist) navigator.storage.persist().catch(()=>{});
 </script>
 </body>
 </html>
