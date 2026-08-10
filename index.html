@@ -1350,7 +1350,10 @@ function renderDay(){
     box.innerHTML = `<div class="dnone">這天沒有排程。<br>可用右下角新增單一行程。</div>`;
     return;
   }
-  box.innerHTML = items.map(it=>{
+  // 未完成排在已完成上面（同一組內維持原本的時間／類型排序）
+  const ordered = items.slice().sort((a,b)=>
+    (isDone(a.row.id, ds) ? 1 : 0) - (isDone(b.row.id, ds) ? 1 : 0));
+  box.innerHTML = ordered.map(it=>{
     const r = it.row, dn = isDone(r.id, ds);
     const ev = it.kind === 'event';
     const col = catColor(r.category);
