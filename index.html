@@ -1280,14 +1280,17 @@ function renderCal(){
       // 已經畫成橫桿的多日行程，不再重複出現在格子裡
       const items = itemsOn(ds).filter(it =>
         !(it.kind === 'event' && it.span > 1 && !spillIds.has(it.row.id)));
-      const dots = items.slice(0,8).map(it=>{
+      // 格子只放得下前幾筆，未完成的排前面，才不會被已完成的擠掉
+      const shown = items.slice().sort((a,b)=>
+        (isDone(a.row.id, ds) ? 1 : 0) - (isDone(b.row.id, ds) ? 1 : 0));
+      const dots = shown.slice(0,8).map(it=>{
       const done = isDone(it.row.id, ds);
       const col = catColor(it.row.category);
       const ev = it.kind === 'event' ? ' evt' : '';
       const im = it.row.important ? ' imp' : '';
       return `<i class="${done?'done':''}${ev}${im}" style="${done?`color:${col}`:`background:${col}`}"></i>`;
     }).join('');
-    const chips = items.slice(0,3).map(it=>{
+    const chips = shown.slice(0,3).map(it=>{
       const done = isDone(it.row.id, ds);
       const col = catColor(it.row.category);
       const st = it.row.important ? STAR : '';
