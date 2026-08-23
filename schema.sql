@@ -59,6 +59,22 @@ create table if not exists public.events (
   constraint events_range_check check (end_date is null or end_date >= date)
 );
 
+-- ---------- 近期任務（頁面三）：一次性的任務，不進月曆 ----------
+create table if not exists public.tasks (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null references auth.users(id) on delete cascade,
+  title        text not null,
+  description  text default '',
+  due_date     date,            -- 截止日（選填，null = 未定）
+  category     text default '',
+  important    boolean not null default false,
+  done         boolean not null default false,
+  completed_at timestamptz,     -- 勾完成的時間；取消再勾會換成新的時間
+  subtasks     jsonb not null default '[]'::jsonb,  -- [{id, title, done}]
+  links        jsonb not null default '[]'::jsonb,
+  created_at   timestamptz not null default now()
+);
+
 -- ---------- 完成紀錄（某項目在某一天被勾選）----------
 create table if not exists public.completions (
   id          uuid primary key default gen_random_uuid(),
@@ -75,6 +91,8 @@ create index if not exists completions_lookup
 create index if not exists schedules_user on public.schedules (user_id);
 create index if not exists events_user_date on public.events (user_id, date);
 create index if not exists events_user_range on public.events (user_id, date, end_date);
+create index if not exists tasks_user_due  on public.tasks (user_id, due_date);
+create index if not exists tasks_user_done on public.tasks (user_id, done, completed_at);
 
 -- =============================================================
 --  Row Level Security：每個人只看得到自己的資料
@@ -83,11 +101,12 @@ alter table public.categories  enable row level security;
 alter table public.schedules   enable row level security;
 alter table public.events      enable row level security;
 alter table public.completions enable row level security;
+alter table public.tasks       enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['categories','schedules','events','completions'] loop
+  foreach t in array array['categories','schedules','events','completions','tasks'] loop
     execute format('drop policy if exists own_select on public.%I', t);
     execute format('drop policy if exists own_insert on public.%I', t);
     execute format('drop policy if exists own_update on public.%I', t);
