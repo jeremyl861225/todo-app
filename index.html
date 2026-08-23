@@ -194,9 +194,19 @@ main{padding:20px 0 40px}
 .sub .st{flex:1;min-width:0;font-size:14px;line-height:1.5;word-break:break-word}
 .sub.on .st{text-decoration:line-through;color:var(--ink2)}
 
-/* 表單裡的子任務列 */
-.subrow{display:flex;gap:7px;margin:0 0 6px;align-items:center}
+/* 表單裡的子任務列（可拖曳排序） */
+.subrow{display:flex;gap:6px;margin:0 0 6px;align-items:center;background:var(--card);border-radius:var(--r-sm)}
 .subrow .inp{height:38px;font-size:14px;flex:1;min-width:0}
+.grip{width:26px;height:38px;flex:none;display:grid;place-items:center;border-radius:7px;
+  color:#AFA48C;cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none;
+  transition:color .15s,background .15s}
+.grip:hover{color:var(--muted);background:var(--bg2)}
+.grip:active{cursor:grabbing}
+.grip svg{width:15px;height:15px;pointer-events:none}
+/* 拖曳中的那一列浮起來，其餘的即時讓位 */
+.subrow.drag{position:relative;z-index:6;box-shadow:var(--sh-2);-webkit-user-select:none;user-select:none}
+.subrow.drag .grip{color:var(--accent);background:var(--accent-soft)}
+.subrow.drag .inp{border-color:var(--accent)}
 
 /* 頁首角落的按鈕 */
 .ph-act{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto}
@@ -1788,6 +1798,9 @@ function openTaskDetail(task){
 function subRowHTML(x){
   x = x || { id:'', title:'', done:false };
   return `<div class="subrow" data-id="${esc(x.id||'')}" data-done="${x.done?'1':'0'}">
+    <button type="button" class="grip" aria-label="拖曳調整順序（也可按住後用上下鍵）">
+      <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>
+    </button>
     <span class="pips" style="flex:none" title="${x.done?'已完成':'未完成'}"><i class="${x.done?'on':''}"></i></span>
     <input class="inp t" placeholder="子任務名稱" value="${esc(x.title||'')}" maxlength="120">
     <button type="button" class="xbtn" data-rm aria-label="移除">
@@ -1799,9 +1812,65 @@ function subsFieldHTML(subs){
   return `<div id="f-subs">${(subs||[]).map(subRowHTML).join('')}</div>
     <button type="button" class="addlink" id="f-addsub">＋ 新增子任務</button>`;
 }
+/** 把某一列往上（-1）或往下（+1）挪一格 */
+function moveSubRow(row, dir){
+  const box = row.parentElement;
+  if(dir < 0 && row.previousElementSibling) box.insertBefore(row, row.previousElementSibling);
+  else if(dir > 0 && row.nextElementSibling) box.insertBefore(row.nextElementSibling, row);
+}
+/** 子任務拖曳排序。用 pointer events，手機觸控與桌機滑鼠同一套；
+    握把上的 touch-action:none 讓拖曳不會變成捲頁面。 */
+function startSubDrag(e, row, box){
+  if(e.pointerType === 'mouse' && e.button !== 0) return;
+  e.preventDefault();
+  const grip = e.currentTarget;
+  let startY = e.clientY;
+  try{ grip.setPointerCapture(e.pointerId); }catch(err){}
+  row.classList.add('drag');
+
+  const mid = el => { const r = el.getBoundingClientRect(); return r.top + r.height/2; };
+  const move = ev=>{
+    row.style.transform = `translateY(${ev.clientY - startY}px)`;
+    // 越過相鄰那列的中線就換位；換完補回基準點，被拖的那列才不會跟著跳
+    for(;;){
+      const my = mid(row);
+      const prev = row.previousElementSibling, next = row.nextElementSibling;
+      let target = null, putBefore = false;
+      if(prev && my < mid(prev)){ target = prev; putBefore = true; }
+      else if(next && my > mid(next)){ target = next; putBefore = false; }
+      if(!target) break;
+      const y0 = row.getBoundingClientRect().top;
+      if(putBefore) box.insertBefore(row, target); else box.insertBefore(target, row);
+      startY += row.getBoundingClientRect().top - y0;
+      row.style.transform = `translateY(${ev.clientY - startY}px)`;
+    }
+  };
+  const end = ()=>{
+    row.classList.remove('drag');
+    row.style.transform = '';
+    grip.removeEventListener('pointermove', move);
+    grip.removeEventListener('pointerup', end);
+    grip.removeEventListener('pointercancel', end);
+  };
+  grip.addEventListener('pointermove', move);
+  grip.addEventListener('pointerup', end);
+  grip.addEventListener('pointercancel', end);
+}
 function wireSubs(root){
   const box = $('#f-subs', root);
-  const bind = row => { $('[data-rm]', row).onclick = ()=>row.remove(); };
+  const bind = row => {
+    $('[data-rm]', row).onclick = ()=>row.remove();
+    const grip = $('.grip', row);
+    grip.addEventListener('pointerdown', e=>startSubDrag(e, row, box));
+    // 桌機／輔助技術：聚焦握把後用上下鍵也能搬
+    grip.addEventListener('keydown', e=>{
+      const d = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
+      if(!d) return;
+      e.preventDefault();
+      moveSubRow(row, d);
+      grip.focus();
+    });
+  };
   $$('.subrow', box).forEach(bind);
   $('#f-addsub', root).onclick = ()=>{
     box.insertAdjacentHTML('beforeend', subRowHTML());
@@ -1832,7 +1901,8 @@ function openTaskForm(existing){
     ${impToggleHTML(t.important)}
     <div class="fld"><label>子任務（選填）</label>${subsFieldHTML(taskSubs(t))}
       <p class="hint">填了子任務，卡片上會用綠色小方塊顯示完成度，標題下也會顯示第一個還沒完成的。
-        這裡只改名稱與增刪，勾選在卡片的詳細內容裡。</p></div>
+        按住左邊的握把可<b>拖曳調整順序</b>（聚焦握把後用 ↑ ↓ 也可以）。
+        這裡只改名稱、順序與增刪，勾選在卡片的詳細內容裡。</p></div>
     <div class="fld"><label for="f-desc">敘述（選填）</label>
       <textarea id="f-desc" class="inp" placeholder="這件事要做什麼、注意事項…">${esc(t.description||'')}</textarea></div>
     <div class="fld"><label>相關連結（選填）</label>${linksHTML(t.links)}</div>`;
