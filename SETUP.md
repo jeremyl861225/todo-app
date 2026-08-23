@@ -9,29 +9,29 @@
 
 ---
 
-## ✅ 目前狀態（2026-08-01）
+## ✅ 目前狀態（2026-08-23）
 
 **已經可以直接使用**：<https://jeremyl861225.github.io/todo-app/>
 
 已完成：Supabase 專案 `dawcpdgonxmhojwonkut` 建立、資料表與 RLS 建好、
 金鑰已填進 `index.html`、部署到 GitHub Pages。
 
-> ⚠️ **更新後要跑 migration**。到 Supabase → SQL Editor 依序執行 `migrations/` 底下的檔案，
-> 否則新增／修改排程會存不起來。App 啟動時會偵測欄位，缺哪一份就在頂端指名顯示。
->
-> | 檔案 | 內容 | 狀態 |
-> |---|---|---|
-> | [`2026-08-recurrence.sql`](migrations/2026-08-recurrence.sql) | 排程起訖日、「自訂」頻率、單一行程多日活動 | ✅ 已執行 |
-> | [`2026-08-important.sql`](migrations/2026-08-important.sql) | 重大事件標記 | ⬜ 待執行 |
-> | [`2026-08-monthly-nth.sql`](migrations/2026-08-monthly-nth.sql) | 每月「第幾個星期幾」 | ⬜ 待執行 |
-> | [`2026-08-tasks.sql`](migrations/2026-08-tasks.sql) | 近期任務（`tasks` 資料表、子任務、完成日期） | ⬜ 待執行 |
+**migration 全部執行完畢**（到 Supabase → SQL Editor 執行 `migrations/` 底下的檔案；
+App 啟動時會偵測欄位，缺哪一份就在頂端指名顯示）：
 
-還沒做的一件事：
+| 檔案 | 內容 | 狀態 |
+|---|---|---|
+| [`2026-08-recurrence.sql`](migrations/2026-08-recurrence.sql) | 排程起訖日、「自訂」頻率、單一行程多日活動 | ✅ 已執行 |
+| [`2026-08-important.sql`](migrations/2026-08-important.sql) | 重大事件標記 | ✅ 已執行 |
+| [`2026-08-monthly-nth.sql`](migrations/2026-08-monthly-nth.sql) | 每月「第幾個星期幾」 | ✅ 已執行 |
+| [`2026-08-tasks.sql`](migrations/2026-08-tasks.sql) | 近期任務（`tasks` 資料表、子任務、完成日期） | ✅ 已執行 2026-08-23 |
 
-- **註冊帳號**。第一次開網頁點「註冊」，用你的 Email 和一組密碼建立帳號。
-  目前 Supabase 的 **Confirm email 仍是開啟的**，所以註冊後要去信箱點確認信才能登入。
-  想省掉這一步，到 Supabase → Authentication → Sign In / Providers → Email →
-  把 **Confirm email** 關掉並 Save（詳見下面步驟三）。
+`tasks` 建好後已用真實 RLS 條件驗過（交易內測試、已 rollback 不留資料）：
+本人可新增／讀取／更新，另一個帳號讀 0 筆、改 0 筆、刪 0 筆，未登入讀 0 筆。
+
+> ⚠️ Supabase 的 **Confirm email 仍是開啟的**，所以新註冊的帳號要去信箱點確認信才能登入。
+> 想省掉這一步，到 Supabase → Authentication → Sign In / Providers → Email →
+> 把 **Confirm email** 關掉並 Save（詳見下面步驟三）。
 
 以下步驟是**重新部署一份**或日後要自己重建時才需要看的紀錄。
 
