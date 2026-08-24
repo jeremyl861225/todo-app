@@ -3,10 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#F3EDE0">
-<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#F3EDE0" id="mt-theme">
+<meta name="color-scheme" content="light dark">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
+<!-- 主題要在第一次繪製前就定好，否則深色使用者會先被白底閃一下 -->
+<script>(function(){try{var t=localStorage.getItem('todo.theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <meta name="apple-mobile-web-app-title" content="待辦">
 <title>待辦事項</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -15,21 +17,122 @@
 <!-- 放在本機而不是 CDN：離線時開得起來，網路擋外部 CDN 時也不受影響 -->
 <script src="vendor/supabase-2.111.0.min.js"></script>
 <style>
+/* =============================================================
+   待辦事項 — 樣式
+   色彩一律走語意 token，深淺兩套只換 token 值，元件本身不分主題。
+   ============================================================= */
 :root{
-  --bg:#F3EDE0; --bg2:#EAE2D1; --card:#FFFCF6; --card2:#FBF6EB;
-  --line:#E2D8C4; --line-soft:#EFE7D8;
-  --ink:#2E2A23; --ink2:#5F594C; --muted:#978E7E;
-  --accent:#4E6B57; --accent-ink:#3C5344; --accent-soft:#E4EDE5;
-  --hot:#B0603A; --hot-soft:#F6E7DE;
-  --danger:#A9483C;
-  --r-lg:16px; --r-md:12px; --r-sm:9px;
-  --sh-1:0 1px 2px rgba(78,64,40,.07);
-  --sh-2:0 2px 4px rgba(78,64,40,.06), 0 10px 28px rgba(78,64,40,.09);
-  --sh-3:0 18px 60px rgba(60,48,28,.22);
-  --nav-h:62px;
+  /* ---- 尺度 ---- */
+  --wrap:1240px;
+  --s-1:4px;  --s-2:6px;  --s-3:8px;  --s-4:12px;
+  --s-5:16px; --s-6:20px; --s-7:24px; --s-8:32px; --s-9:44px;
+  --r-lg:16px; --r-md:12px; --r-sm:9px; --r-xs:6px;
+  --nav-h:64px;
   --lane-h:9px; --bar-h:6px;   /* 多日行程橫桿：每層高度、桿身粗細（與圓點同高） */
+
+  /* ---- 字級（CJK 比拉丁文需要多一點字身才等效清楚）---- */
+  --t-2xs:11.5px; --t-xs:12px;   --t-sm:13px;  --t-md:14px;
+  --t-lg:15px;    --t-xl:17px;   --t-2xl:21px; --t-3xl:24px;
   --font:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+
+  /* ---- 動態：只有一個被刻意設計的瞬間（勾選完成），其餘一律安靜 ---- */
+  --c:#4E6B57;                 /* 類別色的保底值，元素會用 style 覆寫 */
+  --e-out:cubic-bezier(.2,.8,.25,1);
+  --d-1:.14s; --d-2:.22s; --d-3:.36s;
 }
+
+/* ---------- 淺色：暖紙 ---------- */
+:root{
+  color-scheme:light;
+  --bg:#F3EDE0;          --bg2:#EAE2D1;
+  --card:#FFFCF6;        --card2:#FAF5E9;
+  --line:#DFD5C0;        --line-soft:#EDE4D4;
+  --ink:#2A261F;         --ink2:#57503F;       --muted:#726957;
+  --tick:#E4DBC7;                              /* 節奏條的空檔 */
+
+  --accent:#4E6B57;      --accent-ink:#3A5344;
+  --accent-soft:#E2ECE3; --accent-line:#C4D7C8; --on-accent:#FFFCF6;
+  --hot:#A5552F;         --hot-ink:#7A3E24;
+  --hot-soft:#F6E6DB;    --hot-line:#E7CDB9;    --on-hot:#FFFCF6;
+  --danger:#A03B2F;      --danger-soft:#FBEFEC; --danger-line:#E7CDC6;
+
+  --imp-ring:rgba(165,85,47,.34);
+  --imp-ring-hi:rgba(165,85,47,.5);
+  --bg-blur:rgba(243,237,224,.88);
+  --nav-bg:rgba(255,252,246,.94);
+  --scrim:rgba(48,40,26,.42);
+  --toast-bg:#2F2C1D;    --toast-ink:#F6F1E4;
+  --toast-bad:#7C382C;   --toast-bad-ink:#FFF6F2;
+
+  --sh-1:0 1px 2px rgba(64,52,30,.06);
+  --sh-2:0 1px 2px rgba(64,52,30,.05), 0 8px 24px rgba(64,52,30,.09);
+  --sh-3:0 24px 64px rgba(40,30,14,.26);
+  --sh-fab:0 6px 20px rgba(48,72,56,.3);
+  --sh-fab-hi:0 10px 26px rgba(48,72,56,.36);
+}
+
+/* ---------- 深色：暖墨。值班半夜開這個 App 不該被白底閃到 ---------- */
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#15130E;          --bg2:#221F17;
+    --card:#1C1A13;        --card2:#24211A;
+    --line:#3B3629;        --line-soft:#2C2820;
+    --ink:#F0E9D8;         --ink2:#C3BAA4;       --muted:#968D79;
+    --tick:#332F24;
+
+    --accent:#8CB79A;      --accent-ink:#B3D5BC;
+    --accent-soft:#1F2C24; --accent-line:#3A5344; --on-accent:#14231A;
+    --hot:#D18A5E;         --hot-ink:#E8AF87;
+    --hot-soft:#2E2018;    --hot-line:#4A3324;    --on-hot:#1F140D;
+    --danger:#E08573;      --danger-soft:#2E1A16; --danger-line:#4E2C25;
+
+    --imp-ring:rgba(209,138,94,.42);
+    --imp-ring-hi:rgba(209,138,94,.62);
+    --bg-blur:rgba(21,19,14,.88);
+    --nav-bg:rgba(28,26,19,.94);
+    --scrim:rgba(0,0,0,.62);
+    --toast-bg:#EDE6D6;    --toast-ink:#221F17;
+    --toast-bad:#E08573;   --toast-bad-ink:#2A1512;
+
+    --sh-1:0 1px 2px rgba(0,0,0,.34);
+    --sh-2:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.42);
+    --sh-3:0 24px 64px rgba(0,0,0,.66);
+    --sh-fab:0 6px 20px rgba(0,0,0,.5);
+    --sh-fab-hi:0 10px 26px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#15130E;          --bg2:#221F17;
+  --card:#1C1A13;        --card2:#24211A;
+  --line:#3B3629;        --line-soft:#2C2820;
+  --ink:#F0E9D8;         --ink2:#C3BAA4;       --muted:#968D79;
+  --tick:#332F24;
+
+  --accent:#8CB79A;      --accent-ink:#B3D5BC;
+  --accent-soft:#1F2C24; --accent-line:#3A5344; --on-accent:#14231A;
+  --hot:#D18A5E;         --hot-ink:#E8AF87;
+  --hot-soft:#2E2018;    --hot-line:#4A3324;    --on-hot:#1F140D;
+  --danger:#E08573;      --danger-soft:#2E1A16; --danger-line:#4E2C25;
+
+  --imp-ring:rgba(209,138,94,.42);
+  --imp-ring-hi:rgba(209,138,94,.62);
+  --bg-blur:rgba(21,19,14,.88);
+  --nav-bg:rgba(28,26,19,.94);
+  --scrim:rgba(0,0,0,.62);
+  --toast-bg:#EDE6D6;    --toast-ink:#221F17;
+  --toast-bad:#E08573;   --toast-bad-ink:#2A1512;
+
+  --sh-1:0 1px 2px rgba(0,0,0,.34);
+  --sh-2:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.42);
+  --sh-3:0 24px 64px rgba(0,0,0,.66);
+  --sh-fab:0 6px 20px rgba(0,0,0,.5);
+  --sh-fab-hi:0 10px 26px rgba(0,0,0,.6);
+}
+
+/* ---------- 基礎 ---------- */
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
 /* 固定版面：不讓手指縮放，避免誤觸（雙指捏合、連點兩下都不會放大） */
@@ -37,170 +140,241 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:pan-x pan-
 body{touch-action:pan-x pan-y}
 body{
   background:var(--bg); color:var(--ink); font-family:var(--font);
-  font-size:15px; line-height:1.55; letter-spacing:.01em;
-  -webkit-font-smoothing:antialiased;
+  font-size:var(--t-lg); line-height:1.6; letter-spacing:.01em;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
   min-height:100vh; overflow-x:hidden;
 }
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer;border:none;background:none}
-a{color:var(--accent-ink)}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+a{color:var(--accent-ink);text-underline-offset:.22em;text-decoration-thickness:1px}
 .hide{display:none !important}
 
+/* 瀏覽器自己畫的那幾樣也要屬於這套設計 */
+::selection{background:var(--accent-soft);color:var(--accent-ink)}
+input,textarea{caret-color:var(--accent)}
+input,textarea,select,button{accent-color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r-xs)}
+*{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{
+  background:var(--line);border-radius:999px;
+  border:3px solid transparent;background-clip:padding-box;
+}
+::-webkit-scrollbar-thumb:hover{background:var(--muted);background-clip:padding-box}
+
+/* 圖示一律是畫出來的 SVG，共用同一組筆畫粗細 */
+.ic{width:1em;height:1em;flex:none;display:inline-block;vertical-align:-.125em}
+
 /* ---------- shell ---------- */
-.wrap{max-width:1120px;margin:0 auto;padding:0 16px}
+.wrap{max-width:var(--wrap);margin:0 auto;padding:0 var(--s-5)}
 header.top{
   position:sticky; top:0; z-index:40;
-  background:rgba(243,237,224,.9); backdrop-filter:saturate(1.4) blur(10px);
+  background:var(--bg-blur); backdrop-filter:saturate(1.35) blur(12px);
   border-bottom:1px solid var(--line-soft);
   padding-top:env(safe-area-inset-top);
 }
-.top-in{display:flex;align-items:center;gap:12px;min-height:56px}
-.brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.02em;font-size:16px;white-space:nowrap}
+.top-in{display:flex;align-items:center;gap:var(--s-4);min-height:58px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.03em;font-size:var(--t-xl);white-space:nowrap}
 /* 與主畫面 icon 同一個圖案，已去背只留線條 */
 .appicon{display:block;object-fit:contain;width:auto}
-.brand .mk{height:19px;flex:none}
+.brand .mk{height:20px;flex:none}
+:root[data-theme="dark"] .appicon{filter:invert(1) brightness(1.06)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .appicon{filter:invert(1) brightness(1.06)}}
 .top-sp{flex:1}
 .pill{
-  display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;
+  display:inline-flex;align-items:center;gap:var(--s-2);height:29px;padding:0 11px;
   border-radius:999px;background:var(--card);border:1px solid var(--line);
-  font-size:12px;color:var(--ink2);white-space:nowrap;
+  font-size:var(--t-xs);color:var(--ink2);white-space:nowrap;
 }
 .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none}
-.pill.warn{background:var(--hot-soft);border-color:#EBD3C4;color:#7E432A}
+.pill.warn{background:var(--hot-soft);border-color:var(--hot-line);color:var(--hot-ink)}
 .pill.warn .dot{background:var(--hot)}
 .iconbtn{
-  width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+  width:35px;height:35px;border-radius:50%;display:grid;place-items:center;
   border:1px solid var(--line);background:var(--card);color:var(--ink2);
-  transition:background .15s,border-color .15s;flex:none;
+  transition:background var(--d-1),border-color var(--d-1),color var(--d-1);flex:none;
 }
-.iconbtn:hover{background:var(--card2);border-color:#D6CAB2}
+.iconbtn:hover{background:var(--card2);border-color:var(--muted);color:var(--ink)}
 
 /* nav */
 .nav{
-  display:flex;gap:4px;background:var(--bg2);border:1px solid var(--line-soft);
+  display:flex;gap:var(--s-1);background:var(--bg2);border:1px solid var(--line-soft);
   border-radius:999px;padding:4px;
 }
 .nav button{
-  flex:1;height:34px;padding:0 18px;border-radius:999px;font-size:14px;font-weight:600;
+  flex:1;height:35px;padding:0 18px;border-radius:999px;font-size:var(--t-md);font-weight:600;
   color:var(--ink2);display:flex;align-items:center;justify-content:center;gap:7px;
-  transition:background .18s,color .18s,box-shadow .18s;white-space:nowrap;
+  transition:background var(--d-2),color var(--d-2),box-shadow var(--d-2);white-space:nowrap;
 }
+.nav button:hover{color:var(--ink)}
 .nav button.on{background:var(--card);color:var(--accent-ink);box-shadow:var(--sh-1)}
 .nav svg{width:17px;height:17px;flex:none}
 
-main{padding:20px 0 40px}
-.page-head{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin:0 0 16px}
-.page-head h1{margin:0;font-size:21px;letter-spacing:.02em}
-.page-head p{margin:0;color:var(--muted);font-size:13px;flex:1;min-width:140px}
+main{padding:var(--s-6) 0 var(--s-9)}
 
-/* ---------- cards / list ---------- */
-.group{margin:0 0 22px}
-.group-h{display:flex;align-items:center;gap:10px;margin:0 0 9px;padding:0 2px}
-.group-h .t{font-size:13.5px;font-weight:700;letter-spacing:.06em;color:var(--ink2)}
-.group-h .n{font-size:11.5px;color:var(--muted);background:var(--bg2);border-radius:999px;padding:1px 8px}
+/* 頁首：標題與角落按鈕同一列，說明整列在下並收在好讀的行長內 */
+.page-head{
+  display:grid;grid-template-columns:1fr auto;align-items:center;
+  gap:var(--s-1) var(--s-4);margin:0 0 var(--s-6);
+}
+.page-head h1{margin:0;font-size:var(--t-2xl);letter-spacing:.02em;line-height:1.3;grid-area:1/1}
+.page-head p{margin:0;color:var(--muted);font-size:var(--t-sm);line-height:1.65;max-width:640px;grid-area:2/1/auto/-1}
+.ph-act{display:inline-flex;align-items:center;gap:var(--s-2);flex:none;grid-area:1/2}
+.ph-act svg{width:14px;height:14px;flex:none}
+.ph-act .nn{font-size:var(--t-2xs);font-weight:700;background:var(--bg2);border-radius:999px;padding:1px 7px;font-variant-numeric:tabular-nums}
+
+/* ---------- 分組看板 ---------- */
+/* 桌機把「每日／每週／每月／自訂」這種分組排成並列的欄，
+   一組只有一兩張卡時就不會在右邊留下三分之二的空白。 */
+.board{display:grid;gap:var(--s-6)}
+@media(min-width:760px){
+  /* auto-fill 不是 auto-fit：只剩一組時（例如「已完成」只有一個月份）
+     auto-fit 會把那一欄拉成整個版面寬，卡片就變成一條 1200px 的長條。 */
+  .board{grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--s-6) var(--s-5);align-items:start}
+}
+.group{min-width:0}
+.group-h{display:flex;align-items:center;gap:var(--s-3);margin:0 0 var(--s-3);padding:0 2px}
+.group-h .t{font-size:var(--t-sm);font-weight:700;letter-spacing:.08em;color:var(--ink2)}
+.group-h .n{font-size:var(--t-2xs);color:var(--ink2);background:var(--bg2);border-radius:999px;padding:1px 8px;font-variant-numeric:tabular-nums}
 .group-h .ln{flex:1;height:1px;background:var(--line-soft)}
+.group-h .no{font-size:var(--t-2xs);color:var(--muted);flex:none}
 
-.cards{display:grid;gap:9px}
-@media(min-width:760px){.cards{grid-template-columns:repeat(2,1fr)}}
-@media(min-width:1000px){.cards{grid-template-columns:repeat(3,1fr)}}
+.cards{display:grid;gap:var(--s-3)}
 
+/* ---------- 卡片 ---------- */
 .item{
   width:100%;text-align:left;background:var(--card);border:1px solid var(--line);
-  border-radius:var(--r-md);padding:12px 13px;display:flex;gap:11px;align-items:flex-start;
-  box-shadow:var(--sh-1);transition:transform .12s,box-shadow .18s,border-color .18s;
-  min-width:0;
+  border-radius:var(--r-md);padding:13px 14px;display:flex;gap:11px;align-items:flex-start;
+  box-shadow:var(--sh-1);min-width:0;
+  transition:transform var(--d-1),box-shadow var(--d-2),border-color var(--d-2),opacity var(--d-2);
 }
-.item:hover{box-shadow:var(--sh-2);border-color:#D6CAB2;transform:translateY(-1px)}
+.item:hover{box-shadow:var(--sh-2);border-color:var(--muted);transform:translateY(-1px)}
 .item:active{transform:translateY(0)}
-.item .bar{width:3px;align-self:stretch;border-radius:3px;background:var(--accent);flex:none;min-height:34px}
 .item .bd{flex:1;min-width:0;display:block}
-.item .ti{display:block;font-weight:600;font-size:14.5px;line-height:1.4;word-break:break-word}
-.item .mt{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:5px}
-.item .desc{color:var(--muted);font-size:12.5px;margin-top:5px;overflow:hidden;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+.item .ti{display:block;font-weight:600;font-size:var(--t-lg);line-height:1.45;word-break:break-word}
+.item .mt{display:flex;flex-wrap:wrap;gap:var(--s-2);align-items:center;margin-top:var(--s-2)}
+.item .desc{color:var(--muted);font-size:var(--t-sm);margin-top:var(--s-2);overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;line-height:1.55}
 
-.tag{
-  display:inline-flex;align-items:center;gap:5px;font-size:11.5px;line-height:1;
-  padding:4px 8px;border-radius:999px;background:var(--bg2);color:var(--ink2);white-space:nowrap;
+/* ---------- 節奏條 ---------- */
+/* 這個 App 真正獨有的內容是「重複」本身。用未來四週的實際落點畫出來，
+   「每月第一個週五」一眼就看得懂，文字標籤做不到這件事。 */
+.cadence{
+  display:flex;gap:5px;align-items:flex-end;margin-top:10px;
+  padding-bottom:5px;min-width:0;
 }
-.tag.time{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+.cadence b{display:flex;gap:2px;flex:1;min-width:0}
+.cadence i{
+  flex:1;min-width:0;height:12px;border-radius:2px;display:block;position:relative;
+  background:var(--tick);
+}
+.cadence i.on{background:var(--c)}
+.cadence i.now::after{
+  content:"";position:absolute;left:50%;bottom:-5px;
+  width:3px;height:3px;margin-left:-1.5px;border-radius:50%;background:var(--ink2);
+}
+.item.ended .cadence i.on{background:var(--tick)}
+
+/* 詳細內容裡的節奏條：給得起說明就寫清楚 */
+.dv-cad{margin:0 0 var(--s-5)}
+.dv-cad .cadence{margin-top:var(--s-2)}
+.dv-cad .cadence i{height:16px}
+.dv-cad .cap{display:flex;align-items:baseline;gap:var(--s-2);font-size:var(--t-xs);color:var(--muted)}
+.dv-cad .cap b{font-weight:600;color:var(--ink2);font-variant-numeric:tabular-nums}
+
+/* ---------- 標籤 ---------- */
+.tag{
+  display:inline-flex;align-items:center;gap:5px;font-size:var(--t-xs);line-height:1.25;
+  padding:4px 9px;border-radius:999px;background:var(--bg2);color:var(--ink2);white-space:nowrap;
+}
+.tag.time{background:var(--accent-soft);color:var(--accent-ink);font-weight:600;font-variant-numeric:tabular-nums}
 .tag .cd{width:7px;height:7px;border-radius:50%;flex:none}
-.tag.lk{background:#EFEAF0;color:#5B4B62}
+.tag.lk{background:var(--bg2);color:var(--ink2)}
+.tag.lk svg{width:11px;height:11px;flex:none;opacity:.75}
+/* 已結束：改成描邊而非填色，一眼看得出是停用狀態，字也不必壓暗 */
+.tag.over{background:transparent;box-shadow:inset 0 0 0 1px var(--line);color:var(--ink2)}
+.tag.soon{background:var(--hot-soft);color:var(--hot-ink)}
+
 /* ---------- 重大事件 ---------- */
-.star{color:var(--hot);flex:none;display:inline-block;vertical-align:-1px}
+.star{color:var(--hot);flex:none;display:inline-block;vertical-align:-.14em;width:1em;height:1em}
 .item .ti .star{margin-right:5px}
-.item.imp{box-shadow:var(--sh-1), inset 0 0 0 1.5px rgba(176,96,58,.32)}
-.item.imp:hover{box-shadow:var(--sh-2), inset 0 0 0 1.5px rgba(176,96,58,.45)}
-.tag.imp{background:var(--hot-soft);color:#7E432A;font-weight:600}
-.cchip .star{margin-right:2px;font-size:9px}
+.item.imp{box-shadow:var(--sh-1), inset 0 0 0 1.5px var(--imp-ring)}
+.item.imp:hover{box-shadow:var(--sh-2), inset 0 0 0 1.5px var(--imp-ring-hi)}
+.tag.imp{background:var(--hot-soft);color:var(--hot-ink);font-weight:600}
+.cchip .star{margin-right:2px;width:9px;height:9px}
 .dots i.imp{box-shadow:0 0 0 1.5px var(--hot)}
 .dots i.imp.done{box-shadow:0 0 0 1.5px var(--hot), inset 0 0 0 1px currentColor}
-.drow.imp{border-color:rgba(176,96,58,.34)}
+.drow.imp{border-color:var(--imp-ring)}
 .dt .star{margin-right:4px}
 /* 表單裡的開關 */
 .impbtn{display:flex;align-items:center;gap:11px;width:100%;text-align:left;
-  padding:11px 13px;border-radius:var(--r-md);border:1px solid var(--line);
-  background:var(--card2);transition:background .15s,border-color .15s}
+  padding:12px 14px;border-radius:var(--r-md);border:1px solid var(--line);
+  background:var(--card2);transition:background var(--d-1),border-color var(--d-1)}
 .impbtn:hover{background:var(--bg2)}
-.impbtn[aria-pressed="true"]{background:var(--hot-soft);border-color:#E6CDBF}
-.impbtn .bigstar{font-size:19px;color:var(--line);transition:color .15s;flex:none;line-height:1}
+.impbtn[aria-pressed="true"]{background:var(--hot-soft);border-color:var(--hot-line)}
+.impbtn .bigstar{width:21px;height:21px;color:var(--line);transition:color var(--d-1);flex:none;display:block}
 .impbtn[aria-pressed="true"] .bigstar{color:var(--hot)}
 .impbtn .tx{flex:1;min-width:0}
-.impbtn .tx b{display:block;font-size:14.5px;font-weight:600;color:var(--ink)}
-.impbtn .tx small{display:block;font-size:12px;color:var(--muted);margin-top:1px;line-height:1.45}
-.sw{width:42px;height:24px;border-radius:999px;background:var(--line);flex:none;
-  position:relative;transition:background .18s}
-.sw i{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;
-  background:#fff;box-shadow:0 1px 3px rgba(70,58,40,.28);transition:transform .18s}
+.impbtn .tx b{display:block;font-size:var(--t-lg);font-weight:600;color:var(--ink)}
+.impbtn .tx small{display:block;font-size:var(--t-xs);color:var(--muted);margin-top:2px;line-height:1.5}
+.sw{width:44px;height:25px;border-radius:999px;background:var(--line);flex:none;
+  position:relative;transition:background var(--d-2)}
+.sw i{position:absolute;top:2px;left:2px;width:21px;height:21px;border-radius:50%;
+  background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.28);transition:transform var(--d-2) var(--e-out)}
 .impbtn[aria-pressed="true"] .sw{background:var(--hot)}
-.impbtn[aria-pressed="true"] .sw i{transform:translateX(18px)}
+.impbtn[aria-pressed="true"] .sw i{transform:translateX(19px)}
 
-.tag.over{background:#EDE9E1;color:#8A8172}
-.tag.soon{background:var(--hot-soft);color:#7E432A}
-.item.ended{opacity:.62}
-.item.ended .bar{background:var(--muted) !important}
+/* 結束／完成的項目要退到後面，但不可以用整塊 opacity——
+   那會把卡片裡每一個標籤的對比一起壓掉，變成讀不到的淡灰字。
+   改成換底色與標題顏色，退場的感覺一樣，字仍然讀得到。 */
+.item.ended{background:var(--bg);box-shadow:none}
+.item.ended .ti{color:var(--ink2)}
+.item.ended:hover{box-shadow:var(--sh-1)}
 
 /* ---------- 近期任務 ---------- */
-.item.task{gap:9px}
+.item.task{gap:10px}
 .item.task .bd{padding:0;text-align:left}
-.item.task.done{opacity:.6}
-.item.task.done .ti{text-decoration:line-through}
-.item .nextsub{display:flex;align-items:center;gap:5px;margin-top:4px;min-width:0;
-  color:var(--muted);font-size:12.5px;line-height:1.45}
-.item .nextsub b{font-weight:400;color:#C7BDA7;flex:none}
+.item.task.done{background:var(--bg);box-shadow:none}
+.item.task.done:hover{box-shadow:var(--sh-1)}
+.item.task.done .ti{color:var(--ink2);
+  text-decoration:line-through;text-decoration-thickness:1px;text-underline-offset:.2em}
+.item .nextsub{display:flex;align-items:center;gap:var(--s-2);margin-top:var(--s-1);min-width:0;
+  color:var(--muted);font-size:var(--t-sm);line-height:1.5}
+.item .nextsub svg{width:11px;height:11px;flex:none;opacity:.7}
 .item .nextsub em{font-style:normal;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-/* 完成度：一個子任務一格，完成就亮成綠色 */
-.pgs{display:flex;align-items:center;gap:8px;margin-top:7px;flex-wrap:wrap}
+/* 完成度：一個子任務一格，完成就填上類別色 */
+.pgs{display:flex;align-items:center;gap:var(--s-3);margin-top:var(--s-2);flex-wrap:wrap}
 .pips{display:flex;flex-wrap:wrap;gap:3.5px;align-items:center;min-width:0}
-.pips i{width:9px;height:9px;border-radius:2.5px;display:block;
-  background:var(--bg2);box-shadow:inset 0 0 0 1px var(--line)}
-.pips i.on{background:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
-.pn{font-size:11.5px;color:var(--muted);flex:none;font-variant-numeric:tabular-nums}
+.pips i{width:10px;height:10px;border-radius:2.5px;display:block;
+  background:var(--tick);box-shadow:inset 0 0 0 1px var(--line-soft)}
+.pips i.on{background:var(--c);box-shadow:inset 0 0 0 1px var(--c)}
+.pn{font-size:var(--t-2xs);color:var(--muted);flex:none;font-variant-numeric:tabular-nums}
 .pn.full{color:var(--accent-ink);font-weight:700}
 .tag.due{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
-.tag.today{background:var(--hot-soft);color:#7E432A;font-weight:600}
-.tag.late{background:#F2DFD9;color:#8E3F2C;font-weight:600}
+.tag.today{background:var(--hot-soft);color:var(--hot-ink);font-weight:600}
+.tag.late{background:var(--danger-soft);color:var(--danger);font-weight:600}
 .tag.did{background:var(--accent-soft);color:var(--accent-ink)}
+.tag.did svg{width:11px;height:11px;flex:none}
 
 /* 詳細內容裡的子任務 */
-.sub{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;margin:0 0 6px;
-  padding:9px 11px;border-radius:var(--r-sm);border:1px solid var(--line-soft);
-  background:var(--card2);transition:background .14s,border-color .14s}
+.sub{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;margin:0 0 var(--s-2);
+  padding:10px 12px;border-radius:var(--r-sm);border:1px solid var(--line-soft);
+  background:var(--card2);transition:background var(--d-1),border-color var(--d-1)}
 .sub:hover{background:var(--bg2)}
-.sub.on{background:var(--accent-soft);border-color:#CDDCD0}
-.sub .ck{width:20px;height:20px;border-radius:6px;margin-top:0}
+.sub.on{background:var(--accent-soft);border-color:var(--accent-line)}
+.sub .ck{width:21px;height:21px;border-radius:var(--r-xs);margin-top:0}
 .sub .ck svg{width:12px;height:12px}
-.sub .st{flex:1;min-width:0;font-size:14px;line-height:1.5;word-break:break-word}
-.sub.on .st{text-decoration:line-through;color:var(--ink2)}
+.sub .st{flex:1;min-width:0;font-size:var(--t-md);line-height:1.55;word-break:break-word}
+.sub.on .st{text-decoration:line-through;text-decoration-thickness:1px;text-underline-offset:.2em;color:var(--ink2)}
 
 /* 表單裡的子任務列（可拖曳排序） */
-.subrow{display:flex;gap:6px;margin:0 0 6px;align-items:center;background:var(--card);border-radius:var(--r-sm)}
-.subrow .inp{height:38px;font-size:14px;flex:1;min-width:0}
-.grip{width:26px;height:38px;flex:none;display:grid;place-items:center;border-radius:7px;
-  color:#AFA48C;cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none;
-  transition:color .15s,background .15s}
-.grip:hover{color:var(--muted);background:var(--bg2)}
+.subrow{display:flex;gap:var(--s-2);margin:0 0 var(--s-2);align-items:center;background:var(--card);border-radius:var(--r-sm)}
+.subrow .inp{height:39px;font-size:var(--t-md);flex:1;min-width:0}
+.grip{width:27px;height:39px;flex:none;display:grid;place-items:center;border-radius:7px;
+  color:var(--muted);cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none;
+  transition:color var(--d-1),background var(--d-1)}
+.grip:hover{color:var(--ink2);background:var(--bg2)}
 .grip:active{cursor:grabbing}
 .grip svg{width:15px;height:15px;pointer-events:none}
 /* 拖曳中的那一列浮起來，其餘的即時讓位 */
@@ -208,46 +382,47 @@ main{padding:20px 0 40px}
 .subrow.drag .grip{color:var(--accent);background:var(--accent-soft)}
 .subrow.drag .inp{border-color:var(--accent)}
 
-/* 頁首角落的按鈕 */
-.ph-act{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto}
-.ph-act svg{width:14px;height:14px;flex:none}
-.ph-act .nn{font-size:11px;font-weight:700;background:var(--bg2);border-radius:999px;padding:1px 7px}
-.group-h .no{font-size:11.5px;color:var(--muted);flex:none}
-
+/* ---------- 空狀態 ---------- */
 .empty{
-  text-align:center;color:var(--muted);font-size:13.5px;padding:38px 20px;
-  border:1px dashed var(--line);border-radius:var(--r-lg);background:var(--card2);
+  text-align:center;color:var(--muted);font-size:var(--t-sm);padding:var(--s-9) var(--s-6);
+  border:1px solid var(--line-soft);border-radius:var(--r-lg);background:var(--card2);
+  line-height:1.7;
 }
-.empty b{display:block;color:var(--ink2);font-size:15px;margin-bottom:5px;font-weight:600}
+.empty b{display:block;color:var(--ink2);font-size:var(--t-lg);margin-bottom:var(--s-2);font-weight:600}
 
-/* filter row */
-.filters{display:flex;gap:7px;overflow-x:auto;padding:2px 2px 10px;margin:0 0 6px;
+/* ---------- 篩選列 ---------- */
+.filters{display:flex;gap:7px;overflow-x:auto;padding:2px 2px var(--s-4);margin:0 0 var(--s-2);
   scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .filters::-webkit-scrollbar{display:none}
 .chip{
   border:1px solid var(--line);background:var(--card);border-radius:999px;
-  padding:5px 12px;font-size:12.5px;color:var(--ink2);white-space:nowrap;flex:none;
-  display:inline-flex;align-items:center;gap:6px;transition:background .15s,border-color .15s;
+  padding:6px 13px;font-size:var(--t-sm);color:var(--ink2);white-space:nowrap;flex:none;
+  display:inline-flex;align-items:center;gap:var(--s-2);
+  transition:background var(--d-1),border-color var(--d-1),color var(--d-1);
 }
-.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
-.chip.on .cd{box-shadow:0 0 0 1.5px rgba(255,255,255,.7)}
+.chip:hover{background:var(--card2);border-color:var(--muted)}
+.chip svg{width:12px;height:12px;flex:none}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.chip.on:hover{background:var(--accent);border-color:var(--accent)}
+.chip.on .cd{box-shadow:0 0 0 1.5px var(--on-accent)}
 
-/* ---------- calendar ---------- */
-.cal-layout{display:grid;gap:16px}
-@media(min-width:940px){.cal-layout{grid-template-columns:minmax(0,1fr) 330px;align-items:start}}
+/* ---------- 月曆 ---------- */
+.cal-layout{display:grid;gap:var(--s-5)}
+@media(min-width:940px){.cal-layout{grid-template-columns:minmax(0,1fr) 344px;align-items:start}}
 
-.calbar{display:flex;align-items:center;gap:8px;margin:0 0 12px}
-.calbar .mo{font-size:18px;font-weight:700;letter-spacing:.02em;min-width:120px}
+.calbar{display:flex;align-items:center;gap:var(--s-3);margin:0 0 var(--s-4)}
+.calbar .mo{font-size:var(--t-xl);font-weight:700;letter-spacing:.03em;min-width:126px;font-variant-numeric:tabular-nums}
 .calbar .sp{flex:1}
 .tbtn{border:1px solid var(--line);background:var(--card);border-radius:999px;
-  height:31px;padding:0 13px;font-size:13px;color:var(--ink2);box-shadow:var(--sh-1)}
-.tbtn:hover{background:var(--card2)}
+  height:32px;padding:0 14px;font-size:var(--t-sm);color:var(--ink2);box-shadow:var(--sh-1);
+  transition:background var(--d-1),border-color var(--d-1),color var(--d-1)}
+.tbtn:hover{background:var(--card2);border-color:var(--muted);color:var(--ink)}
 
 .cal{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
-  box-shadow:var(--sh-1);overflow:hidden}
+  box-shadow:var(--sh-1);overflow:hidden;font-variant-numeric:tabular-nums}
 .cal .dow{display:grid;grid-template-columns:repeat(7,1fr);background:var(--card2);
   border-bottom:1px solid var(--line-soft)}
-.cal .dow span{text-align:center;font-size:11.5px;color:var(--muted);padding:8px 0;font-weight:600;letter-spacing:.05em}
+.cal .dow span{text-align:center;font-size:var(--t-2xs);color:var(--muted);padding:9px 0;font-weight:600;letter-spacing:.08em}
 .cal .dow span.we{color:var(--hot)}
 .cal .grid{display:flex;flex-direction:column}
 .week{position:relative}
@@ -259,7 +434,7 @@ main{padding:20px 0 40px}
 .bar-ev{
   pointer-events:auto;margin:0 3px;height:var(--bar-h);border-radius:999px;
   background:var(--c);display:block;padding:0;min-width:0;
-  transition:filter .14s,opacity .14s;
+  transition:filter var(--d-1),opacity var(--d-1);
 }
 .bar-ev:hover{filter:brightness(1.12)}
 /* 被週界切斷的那一端切平，才看得出是同一條延續下去 */
@@ -272,15 +447,18 @@ main{padding:20px 0 40px}
 .cell .lanes{flex:none;display:block}
 .cell{
   position:relative;border-right:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);
-  min-height:56px;padding:5px 4px 4px;text-align:left;display:flex;flex-direction:column;gap:3px;
-  background:var(--card);transition:background .14s;min-width:0;overflow:hidden;
+  min-height:58px;padding:5px 4px 4px;text-align:left;display:flex;flex-direction:column;gap:3px;
+  background:var(--card);transition:background var(--d-1);min-width:0;overflow:hidden;
 }
 .cell:nth-child(7n){border-right:none}
-.cell.out{background:var(--card2);opacity:.55}
+/* 非本月：靠底色退到後面就夠了，再壓透明度會讓日期與晶片掉到讀不清 */
+.cell.out{background:var(--card2)}
+.cell.out .dn{color:var(--muted)}
+.cell.out .dots{opacity:.55}
 .cell:hover{background:var(--card2)}
-.cell .dn{font-size:12.5px;font-weight:600;color:var(--ink2);width:22px;height:22px;
+.cell .dn{font-size:var(--t-sm);font-weight:600;color:var(--ink2);width:23px;height:23px;
   display:grid;place-items:center;border-radius:50%;flex:none}
-.cell.today .dn{background:var(--hot);color:#fff}
+.cell.today .dn{background:var(--hot);color:var(--on-hot)}
 .cell.sel{background:var(--accent-soft)}
 .cell.sel::after{content:"";position:absolute;inset:0;border:2px solid var(--accent);
   border-radius:2px;pointer-events:none}
@@ -289,121 +467,146 @@ main{padding:20px 0 40px}
 .dots i.done{box-shadow:inset 0 0 0 1px currentColor;background:transparent !important;opacity:.45}
 .dots i.evt{border-radius:1.5px;transform:rotate(45deg)}   /* 單一行程用菱形 */
 .cchips{display:none;flex-direction:column;gap:2px;min-width:0}
-.cchip{font-size:11px;line-height:1.35;padding:2px 5px;border-radius:5px;background:var(--bg2);
+.cchip{font-size:var(--t-2xs);line-height:1.4;padding:2px 6px;border-radius:5px;background:var(--bg2);
   color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  border-left:2.5px solid var(--accent)}
-.cchip.done{opacity:.45;text-decoration:line-through}
-/* 單一行程：圓角實心色塊；重複排程：灰底＋左側色條 */
-.cchip.evt{border-left:none;background:var(--c-soft);color:var(--c);font-weight:600;
+  box-shadow:inset 2px 0 0 var(--c)}
+/* 已完成的晶片改成只留描邊，退場感一樣但字不會掉到讀不到 */
+.cchip.done{background:transparent;color:var(--ink2);
+  box-shadow:inset 0 0 0 1px var(--line);text-decoration:line-through;text-decoration-thickness:1px}
+/* 單一行程：淡染色的圓角膠囊；重複排程：灰底＋左側色條。
+   色相由底色與外框帶，字一律用 ink，才不會因為使用者挑了淺色類別而讀不到。 */
+.cchip.evt{background:var(--c-soft);color:var(--ink);font-weight:600;
   box-shadow:inset 0 0 0 1px var(--c-line);border-radius:999px;padding:2px 8px}
+.cchip.evt.done{background:transparent;color:var(--ink2);box-shadow:inset 0 0 0 1px var(--c-line)}
 .cchip.evt.st{border-radius:999px 3px 3px 999px}
 .cchip.evt.mid{border-radius:3px}
 .cchip.evt.en{border-radius:3px 999px 999px 3px}
-.cchip.evt .cnt{font-weight:400;opacity:.6;margin-right:2px}
-.cmore{font-size:10.5px;color:var(--muted);padding-left:5px}
+.cchip.evt .cnt{width:8px;height:8px;flex:none;opacity:.6;margin-right:2px;display:inline-block;vertical-align:-.05em}
+.cmore{font-size:var(--t-2xs);color:var(--ink2);padding-left:6px}
 @media(min-width:940px){
   .wk-bars{bottom:5px}
-  .cell{min-height:104px;padding:6px 5px 5px}
+  .cell{min-height:106px;padding:6px 5px 5px}
   .dots{display:none}
   .cchips{display:flex}
 }
+@media(min-width:1180px){
+  .cell{min-height:120px}
+  .cchip{font-size:var(--t-xs);padding:3px 7px}
+  .cchip.evt{padding:3px 9px}
+}
 
-.legend{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:9px 13px;
-  background:var(--card2);border-top:1px solid var(--line-soft);font-size:11.5px;color:var(--muted)}
-.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend{display:flex;align-items:center;gap:var(--s-5);flex-wrap:wrap;padding:10px 14px;
+  background:var(--card2);border-top:1px solid var(--line-soft);font-size:var(--t-2xs);color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:var(--s-2)}
 .legend .lg-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
 .legend .lg-dot.evt{border-radius:1.5px;transform:rotate(45deg)}
 .legend .lg-bar{width:22px;height:6px;border-radius:999px;background:var(--muted);flex:none;opacity:.7}
-.legend .lg-note{margin-left:auto;opacity:.8}
+.legend .lg-note{margin-left:auto}
 
-/* day panel */
+/* ---------- 當日面板 ---------- */
 .daypanel{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
   box-shadow:var(--sh-1);overflow:hidden}
-.daypanel .dh{padding:13px 15px;border-bottom:1px solid var(--line-soft);background:var(--card2);
+.daypanel .dh{padding:14px 16px;border-bottom:1px solid var(--line-soft);background:var(--card2);
   display:flex;align-items:baseline;gap:9px}
-.daypanel .dh .d1{font-size:17px;font-weight:700}
-.daypanel .dh .d2{font-size:12.5px;color:var(--muted)}
+.daypanel .dh .d1{font-size:var(--t-xl);font-weight:700;font-variant-numeric:tabular-nums}
+.daypanel .dh .d2{font-size:var(--t-xs);color:var(--muted)}
 .daypanel .dh .sp{flex:1}
-.daypanel .dh .prog{font-size:12px;color:var(--accent-ink);font-weight:600}
-.dlist{padding:8px;display:flex;flex-direction:column;gap:6px;max-height:min(58vh,560px);overflow-y:auto}
-@media(min-width:940px){.dlist{max-height:calc(100vh - 240px)}}
-.drow{display:flex;align-items:flex-start;gap:9px;padding:9px 10px;border-radius:var(--r-sm);
-  border:1px solid var(--line-soft);background:var(--card);transition:background .14s}
+.daypanel .dh .prog{font-size:var(--t-xs);color:var(--accent-ink);font-weight:600;font-variant-numeric:tabular-nums}
+.dlist{padding:var(--s-3);display:flex;flex-direction:column;gap:var(--s-2);max-height:min(58vh,560px);overflow-y:auto}
+@media(min-width:940px){.dlist{max-height:calc(100vh - 248px)}}
+.drow{display:flex;align-items:flex-start;gap:10px;padding:10px 11px;border-radius:var(--r-sm);
+  border:1px solid var(--line-soft);background:var(--card);
+  transition:background var(--d-1),opacity var(--d-2)}
 .drow:hover{background:var(--card2)}
 .drow.evt{background:var(--c-soft);border-color:var(--c-line)}
-.drow.evt:hover{background:var(--c-soft);filter:brightness(.985)}
-.tag.ev{background:var(--c-soft);color:var(--c);font-weight:600;box-shadow:inset 0 0 0 1px var(--c-line)}
-.drow.done{opacity:.6}
-.drow.done .dt{text-decoration:line-through}
-.ck{width:22px;height:22px;border-radius:7px;border:1.8px solid var(--line);background:var(--card);
-  flex:none;display:grid;place-items:center;margin-top:1px;transition:background .15s,border-color .15s}
+.drow.evt:hover{background:var(--c-soft);filter:brightness(1.03)}
+.tag.ev{background:var(--c-soft);color:var(--ink);font-weight:600;box-shadow:inset 0 0 0 1px var(--c-line)}
+.drow.done{background:var(--bg)}
+.drow.done .dt{color:var(--ink2);
+  text-decoration:line-through;text-decoration-thickness:1px;text-underline-offset:.2em}
+/* 行程列本來就有自己的底色，完成後改用中性底，才看得出已經處理過 */
+.drow.evt.done{background:var(--bg);border-color:var(--line-soft)}
+.drow.evt.done .tag.ev{background:var(--bg2);color:var(--ink2);box-shadow:none}
+.ck{width:23px;height:23px;border-radius:7px;border:1.8px solid var(--line);background:var(--card);
+  flex:none;display:grid;place-items:center;margin-top:1px;
+  transition:background var(--d-2) var(--e-out),border-color var(--d-2)}
 .ck:hover{border-color:var(--accent)}
 .ck.on{background:var(--accent);border-color:var(--accent)}
-.ck svg{width:13px;height:13px;color:#fff;opacity:0}
+.ck svg{width:13px;height:13px;color:var(--on-accent);opacity:0}
 .ck.on svg{opacity:1}
 .dmain{flex:1;min-width:0;text-align:left}
-.dt{display:block;font-size:14px;font-weight:600;line-height:1.4;word-break:break-word}
-.dsub{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
-.dnone{color:var(--muted);font-size:13px;text-align:center;padding:26px 10px}
+.dt{display:block;font-size:var(--t-md);font-weight:600;line-height:1.45;word-break:break-word}
+.dsub{display:flex;flex-wrap:wrap;gap:5px;margin-top:var(--s-1)}
+.dnone{color:var(--muted);font-size:var(--t-sm);text-align:center;padding:var(--s-8) var(--s-4);line-height:1.7}
+
+/* 唯一被刻意設計的動態：勾完成的那一下。只在「剛剛切換」的那一列播放 */
+@keyframes ck-pop{0%{transform:scale(1)}36%{transform:scale(.84)}100%{transform:scale(1)}}
+@keyframes ck-draw{from{stroke-dashoffset:26}to{stroke-dashoffset:0}}
+.pop .ck.on{animation:ck-pop var(--d-3) var(--e-out)}
+.pop .ck.on svg path{stroke-dasharray:26;animation:ck-draw .3s .05s var(--e-out) backwards}
 
 /* ---------- FAB ---------- */
 .fab{
-  position:fixed;right:max(16px,env(safe-area-inset-right));
+  position:fixed;right:max(var(--s-5),env(safe-area-inset-right));
   bottom:calc(var(--nav-h) + 18px + env(safe-area-inset-bottom));
-  z-index:45;height:50px;padding:0 20px 0 17px;border-radius:999px;
-  background:var(--accent);color:#fff;font-weight:600;font-size:14.5px;
-  display:flex;align-items:center;gap:8px;box-shadow:0 6px 20px rgba(48,72,56,.32);
-  transition:transform .14s,box-shadow .18s;
+  z-index:45;height:51px;padding:0 21px 0 18px;border-radius:999px;
+  background:var(--accent);color:var(--on-accent);font-weight:600;font-size:var(--t-lg);
+  display:flex;align-items:center;gap:var(--s-3);box-shadow:var(--sh-fab);
+  transition:transform var(--d-1),box-shadow var(--d-2);
 }
-.fab:hover{transform:translateY(-1px);box-shadow:0 10px 26px rgba(48,72,56,.38)}
+.fab:hover{transform:translateY(-1px);box-shadow:var(--sh-fab-hi)}
+.fab:active{transform:translateY(0)}
 .fab svg{width:18px;height:18px}
-@media(min-width:760px){.fab{bottom:26px;right:26px}}
+@media(min-width:760px){.fab{bottom:var(--s-7);right:var(--s-7)}}
 
 /* ---------- modal ---------- */
-.ov{position:fixed;inset:0;z-index:60;background:rgba(48,40,26,.42);
+.ov{position:fixed;inset:0;z-index:60;background:var(--scrim);
   backdrop-filter:blur(3px);display:flex;align-items:flex-end;justify-content:center;
-  padding:0;animation:fade .16s ease}
-@media(min-width:640px){.ov{align-items:center;padding:24px}}
+  padding:0;animation:fade var(--d-1) ease}
+@media(min-width:640px){.ov{align-items:center;padding:var(--s-7)}}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 @keyframes rise{from{transform:translateY(22px);opacity:.4}to{transform:none;opacity:1}}
 .sheet{
   background:var(--card);width:100%;max-width:560px;border-radius:18px 18px 0 0;
   box-shadow:var(--sh-3);display:flex;flex-direction:column;
-  max-height:92vh;max-height:92dvh;animation:rise .2s cubic-bezier(.2,.7,.3,1);overflow:hidden;
+  max-height:92vh;max-height:92dvh;animation:rise var(--d-2) var(--e-out);overflow:hidden;
 }
 @media(min-width:640px){.sheet{border-radius:var(--r-lg);max-height:88vh}}
-.sh-h{display:flex;align-items:center;gap:10px;padding:15px 16px 12px;border-bottom:1px solid var(--line-soft);
+.sh-h{display:flex;align-items:center;gap:10px;padding:16px 17px 13px;border-bottom:1px solid var(--line-soft);
   background:var(--card2);flex:none}
-.sh-h h2{margin:0;font-size:16.5px;font-weight:700;flex:1;min-width:0;word-break:break-word;line-height:1.4}
-.sh-b{padding:16px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
-.sh-f{padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line-soft);
+.sh-h h2{margin:0;font-size:var(--t-xl);font-weight:700;flex:1;min-width:0;word-break:break-word;line-height:1.45}
+.sh-b{padding:var(--s-5);overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
+.sh-f{padding:var(--s-4) var(--s-5) calc(var(--s-4) + env(safe-area-inset-bottom));border-top:1px solid var(--line-soft);
   display:flex;gap:9px;background:var(--card2);flex:none}
 .sh-f .sp{flex:1}
 
-.btn{height:40px;padding:0 18px;border-radius:var(--r-sm);font-size:14.5px;font-weight:600;
-  border:1px solid var(--line);background:var(--card);color:var(--ink2);
-  display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:background .15s,border-color .15s}
-.btn:hover{background:var(--bg2)}
-.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
-.btn.pri:hover{background:var(--accent-ink)}
-.btn.dg{color:var(--danger);border-color:#E3CFC9;background:#FBF0EE}
-.btn.dg:hover{background:#F6E3DF}
+.btn{height:41px;padding:0 19px;border-radius:var(--r-sm);font-size:var(--t-lg);font-weight:600;
+  border:1px solid var(--line);background:var(--card);color:var(--ink2);white-space:nowrap;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  transition:background var(--d-1),border-color var(--d-1),color var(--d-1)}
+.btn:hover{background:var(--bg2);color:var(--ink)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.pri:hover{background:var(--accent-ink);border-color:var(--accent-ink);color:var(--on-accent)}
+.btn.dg{color:var(--danger);border-color:var(--danger-line);background:var(--danger-soft)}
+.btn.dg:hover{background:var(--danger-soft);border-color:var(--danger);color:var(--danger)}
 .btn.wide{width:100%}
 .btn svg{width:16px;height:16px}
 .btn:disabled{opacity:.5;pointer-events:none}
 
-/* form */
-.fld{margin:0 0 15px}
-.fld>label{display:block;font-size:12.5px;font-weight:600;color:var(--ink2);margin:0 0 6px;letter-spacing:.03em}
-.inp{width:100%;height:42px;padding:0 12px;border-radius:var(--r-sm);border:1px solid var(--line);
-  background:var(--card2);transition:border-color .15s,background .15s;font-size:15px}
-textarea.inp{height:auto;min-height:86px;padding:10px 12px;line-height:1.6;resize:vertical}
-.inp:focus{outline:none;border-color:var(--accent);background:var(--card)}
+/* ---------- 表單 ---------- */
+.fld{margin:0 0 var(--s-5)}
+.fld>label{display:block;font-size:var(--t-xs);font-weight:600;color:var(--ink2);margin:0 0 var(--s-2);letter-spacing:.04em}
+.inp{width:100%;height:43px;padding:0 13px;border-radius:var(--r-sm);border:1px solid var(--line);
+  background:var(--card2);transition:border-color var(--d-1),background var(--d-1),box-shadow var(--d-1);font-size:var(--t-lg)}
+textarea.inp{height:auto;min-height:88px;padding:11px 13px;line-height:1.65;resize:vertical}
+.inp::placeholder{color:var(--muted);opacity:1}
+.inp:focus{outline:none;border-color:var(--accent);background:var(--card);box-shadow:0 0 0 3px var(--accent-soft)}
 /* iOS 的原生日期控制項有內建最小寬度、不吃 width:100%，會撐出容器。
    關掉原生外觀並讓內層值可以收縮，才會跟其他欄位一樣寬。 */
 input[type=date].inp{
   -webkit-appearance:none; appearance:none;
   width:100%; max-width:100%; min-width:0;
+  text-align:left;               /* 沒填值時的「年/月/日」預設會置中，跟填了值的欄位對不齊 */
 }
 input[type=date]::-webkit-date-and-time-value{
   text-align:left; margin:0; min-width:0; max-width:100%;
@@ -415,144 +618,173 @@ input[type=date].empty::-webkit-datetime-edit-text,
 input[type=date].empty::-webkit-datetime-edit-year-field,
 input[type=date].empty::-webkit-datetime-edit-month-field,
 input[type=date].empty::-webkit-datetime-edit-day-field{color:var(--muted)}
-input[type=date]::-webkit-calendar-picker-indicator{opacity:.45;cursor:pointer}
-input[type=date]::-webkit-calendar-picker-indicator:hover{opacity:.8}
-select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23978E7E' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat:no-repeat;background-position:right 11px center;background-size:16px;padding-right:34px}
-.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+input[type=date]::-webkit-calendar-picker-indicator{opacity:.5;cursor:pointer}
+input[type=date]::-webkit-calendar-picker-indicator:hover{opacity:.85}
+select.inp{appearance:none;background-image:var(--sel-arrow);
+  background-repeat:no-repeat;background-position:right 12px center;background-size:16px;padding-right:36px}
+:root{--sel-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23726957' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")}
+:root[data-theme="dark"]{--sel-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23968D79' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--sel-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23968D79' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")}}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--s-2)}
 .seg.two{grid-template-columns:repeat(2,1fr)}
-.seg button{height:38px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--card2);
-  font-size:13.5px;font-weight:600;color:var(--ink2);transition:all .15s;padding:0 4px}
-.seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.seg button{height:39px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--card2);
+  font-size:var(--t-md);font-weight:600;color:var(--ink2);padding:0 4px;
+  transition:background var(--d-1),border-color var(--d-1),color var(--d-1)}
+.seg button:hover{background:var(--bg2);color:var(--ink)}
+.seg button.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.seg button.on:hover{background:var(--accent);color:var(--on-accent)}
 .wk{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
-.wk button{height:38px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--card2);
-  font-size:13.5px;font-weight:600;color:var(--ink2);transition:all .15s}
-.wk button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.wk button{height:39px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--card2);
+  font-size:var(--t-md);font-weight:600;color:var(--ink2);
+  transition:background var(--d-1),border-color var(--d-1),color var(--d-1)}
+.wk button:hover{background:var(--bg2)}
+.wk button.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .wk button.we{color:var(--hot)}
-.wk button.we.on{color:#fff}
-.linkrow{display:flex;gap:6px;margin:0 0 6px;align-items:center}
-.linkrow .inp{height:38px;font-size:14px}
+.wk button.we.on{color:var(--on-accent)}
+.linkrow{display:flex;gap:var(--s-2);margin:0 0 var(--s-2);align-items:center}
+.linkrow .inp{height:39px;font-size:var(--t-md)}
+.linkrow .btn{flex:none;height:39px;padding:0 15px;font-size:var(--t-md)}
 .linkrow .n{flex:0 0 32%;min-width:0}
 .linkrow .u{flex:1;min-width:0}
-.xbtn{width:32px;height:32px;flex:none;border-radius:8px;display:grid;place-items:center;
-  color:var(--muted);border:1px solid transparent}
+.xbtn{width:33px;height:33px;flex:none;border-radius:var(--r-xs);display:grid;place-items:center;
+  color:var(--muted);border:1px solid transparent;transition:background var(--d-1),color var(--d-1)}
 .xbtn:hover{background:var(--hot-soft);color:var(--hot)}
-.addlink{font-size:13px;color:var(--accent-ink);font-weight:600;padding:5px 2px}
+.addlink{font-size:var(--t-sm);color:var(--accent-ink);font-weight:600;padding:var(--s-2) 2px;border-radius:var(--r-xs);
+  display:inline-flex;align-items:center;gap:5px}
+.addlink svg{width:13px;height:13px;flex:none}
 .addlink:hover{text-decoration:underline}
-.hint{font-size:12px;color:var(--muted);margin:6px 0 0;line-height:1.5}
-.err{font-size:13px;color:var(--danger);background:#FBF0EE;border:1px solid #E9D5D0;
-  border-radius:var(--r-sm);padding:9px 11px;margin:0 0 14px}
+.hint{font-size:var(--t-xs);color:var(--muted);margin:var(--s-2) 0 0;line-height:1.6}
+.err{font-size:var(--t-sm);color:var(--danger);background:var(--danger-soft);border:1px solid var(--danger-line);
+  border-radius:var(--r-sm);padding:10px 12px;margin:0 0 var(--s-4);line-height:1.6}
 
-/* detail */
-.dv-badges{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 14px}
-.dv-sec{margin:0 0 16px}
-.dv-sec h3{margin:0 0 6px;font-size:11.5px;letter-spacing:.1em;color:var(--muted);font-weight:700}
-.dv-txt{white-space:pre-wrap;word-break:break-word;font-size:14.5px;line-height:1.7;color:var(--ink)}
-.dv-link{display:flex;align-items:center;gap:9px;padding:10px 12px;border:1px solid var(--line);
-  border-radius:var(--r-sm);background:var(--card2);margin:0 0 6px;text-decoration:none;color:var(--ink);
-  transition:background .15s,border-color .15s}
-.dv-link:hover{background:var(--accent-soft);border-color:#CBDCCE}
+/* ---------- 詳細內容 ---------- */
+.dv-badges{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 var(--s-5)}
+.dv-sec{margin:0 0 var(--s-5)}
+.dv-sec h3{margin:0 0 var(--s-2);font-size:var(--t-2xs);letter-spacing:.12em;color:var(--muted);font-weight:700}
+.dv-txt{white-space:pre-wrap;word-break:break-word;font-size:var(--t-lg);line-height:1.75;color:var(--ink)}
+.dv-link{display:flex;align-items:center;gap:10px;padding:11px 13px;border:1px solid var(--line);
+  border-radius:var(--r-sm);background:var(--card2);margin:0 0 var(--s-2);text-decoration:none;color:var(--ink);
+  transition:background var(--d-1),border-color var(--d-1)}
+.dv-link:hover{background:var(--accent-soft);border-color:var(--accent-line)}
 .dv-link .lt{flex:1;min-width:0;display:block}
-.dv-link .l1{display:block;font-size:14px;font-weight:600;word-break:break-word}
-.dv-link .l2{display:block;font-size:11.5px;color:var(--muted);word-break:break-all;line-height:1.4;margin-top:1px}
+.dv-link .l1{display:block;font-size:var(--t-md);font-weight:600;word-break:break-word}
+.dv-link .l2{display:block;font-size:var(--t-2xs);color:var(--muted);word-break:break-all;line-height:1.45;margin-top:2px}
 .dv-link svg{width:16px;height:16px;color:var(--muted);flex:none}
-.dv-check{display:flex;align-items:center;gap:11px;padding:13px;border-radius:var(--r-md);
-  border:1px solid var(--line);background:var(--card2);width:100%;text-align:left;transition:all .15s}
-.dv-check.on{background:var(--accent-soft);border-color:#C4D8C8}
-.dv-check .t{font-size:14.5px;font-weight:600}
-.dv-check .s{font-size:12px;color:var(--muted)}
-.dv-note{font-size:12px;color:var(--muted);text-align:center;padding:2px 0 0;line-height:1.5}
+.dv-check{display:flex;align-items:center;gap:11px;padding:14px;border-radius:var(--r-md);
+  border:1px solid var(--line);background:var(--card2);width:100%;text-align:left;
+  transition:background var(--d-1),border-color var(--d-1)}
+.dv-check:hover{background:var(--bg2)}
+.dv-check.on{background:var(--accent-soft);border-color:var(--accent-line)}
+.dv-check .t{font-size:var(--t-lg);font-weight:600}
+.dv-check .s{font-size:var(--t-xs);color:var(--muted)}
+.dv-note{font-size:var(--t-xs);color:var(--muted);text-align:center;padding:2px 0 0;line-height:1.6}
 
-/* auth */
-.authwrap{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px 18px}
-.authbox{width:100%;max-width:392px;background:var(--card);border:1px solid var(--line);
-  border-radius:var(--r-lg);box-shadow:var(--sh-2);padding:28px 24px calc(24px + env(safe-area-inset-bottom))}
-.authbox .lg{display:flex;flex-direction:column;align-items:center;gap:9px;margin:0 0 22px;text-align:center}
-.authbox .lg .lg-icon{height:40px;margin-bottom:2px}
-.authbox .lg b{font-size:19px;letter-spacing:.03em}
-.authbox .lg span{font-size:13px;color:var(--muted)}
-.authtabs{display:flex;gap:4px;background:var(--bg2);border-radius:999px;padding:4px;margin:0 0 20px}
-.authtabs button{flex:1;height:34px;border-radius:999px;font-size:14px;font-weight:600;color:var(--ink2)}
+/* ---------- 登入 ---------- */
+.authwrap{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:var(--s-7) 18px}
+.authbox{width:100%;max-width:396px;background:var(--card);border:1px solid var(--line);
+  border-radius:var(--r-lg);box-shadow:var(--sh-2);padding:30px var(--s-7) calc(var(--s-7) + env(safe-area-inset-bottom))}
+.authbox .lg{display:flex;flex-direction:column;align-items:center;gap:9px;margin:0 0 var(--s-7);text-align:center}
+.authbox .lg .lg-icon{height:42px;margin-bottom:2px}
+.authbox .lg b{font-size:var(--t-2xl);letter-spacing:.04em}
+.authbox .lg span{font-size:var(--t-sm);color:var(--muted)}
+.authtabs{display:flex;gap:var(--s-1);background:var(--bg2);border-radius:999px;padding:4px;margin:0 0 var(--s-6)}
+.authtabs button{flex:1;height:35px;border-radius:999px;font-size:var(--t-md);font-weight:600;color:var(--ink2);
+  transition:background var(--d-2),color var(--d-2),box-shadow var(--d-2)}
 .authtabs button.on{background:var(--card);color:var(--accent-ink);box-shadow:var(--sh-1)}
-.linkbtn{font-size:13px;color:var(--accent-ink);font-weight:600;padding:6px 8px;border-radius:8px}
+.linkbtn{font-size:var(--t-sm);color:var(--accent-ink);font-weight:600;padding:var(--s-2) var(--s-3);border-radius:var(--r-xs);
+  display:inline-flex;align-items:center;gap:4px;transition:background var(--d-1)}
+.linkbtn svg{width:13px;height:13px;flex:none}
 .linkbtn:hover{background:var(--accent-soft)}
-.ok{font-size:13px;color:var(--accent-ink);background:var(--accent-soft);border:1px solid #CDDCD0;
-  border-radius:var(--r-sm);padding:9px 11px;margin:0 0 14px;line-height:1.6}
+.ok{font-size:var(--t-sm);color:var(--accent-ink);background:var(--accent-soft);border:1px solid var(--accent-line);
+  border-radius:var(--r-sm);padding:10px 12px;margin:0 0 var(--s-4);line-height:1.65}
 
-/* menu */
-.menu{position:absolute;right:16px;top:calc(56px + env(safe-area-inset-top));z-index:50;
+/* ---------- 選單 ---------- */
+.menu{position:absolute;right:var(--s-5);top:calc(58px + env(safe-area-inset-top));z-index:50;
   background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);
-  box-shadow:var(--sh-2);padding:6px;min-width:212px}
-.menu .who{padding:8px 10px 10px;border-bottom:1px solid var(--line-soft);margin:0 0 6px}
-.menu .who b{display:block;font-size:13px;font-weight:600;word-break:break-all;line-height:1.4}
-.menu .who span{font-size:11.5px;color:var(--muted)}
-.menu button{display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:9px 10px;
-  border-radius:var(--r-sm);font-size:13.5px;color:var(--ink2)}
-.menu button:hover{background:var(--bg2)}
+  box-shadow:var(--sh-2);padding:var(--s-2);min-width:224px}
+.menu .who{padding:var(--s-3) 10px 10px;border-bottom:1px solid var(--line-soft);margin:0 0 var(--s-2)}
+.menu .who b{display:block;font-size:var(--t-sm);font-weight:600;word-break:break-all;line-height:1.45}
+.menu .who span{font-size:var(--t-2xs);color:var(--muted)}
+.menu button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px;
+  border-radius:var(--r-sm);font-size:var(--t-sm);color:var(--ink2);transition:background var(--d-1),color var(--d-1)}
+.menu button:hover{background:var(--bg2);color:var(--ink)}
 .menu button.dg{color:var(--danger)}
 .menu svg{width:15px;height:15px;flex:none}
+.menu .sep{height:1px;background:var(--line-soft);margin:var(--s-2) 0}
+/* 主題三選一 */
+.menu .thm{padding:var(--s-2) 10px var(--s-3)}
+.menu .thm>span{display:block;font-size:var(--t-2xs);color:var(--muted);margin:0 0 var(--s-2);letter-spacing:.08em;font-weight:600}
+.thmseg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--bg2);border-radius:999px;padding:3px}
+.thmseg button{justify-content:center;gap:5px;padding:0;height:30px;border-radius:999px;font-size:var(--t-xs);font-weight:600;color:var(--ink2)}
+.thmseg button:hover{background:transparent;color:var(--ink)}
+.thmseg button.on{background:var(--card);color:var(--accent-ink);box-shadow:var(--sh-1)}
+.thmseg svg{width:13px;height:13px}
 
-/* toast */
+/* ---------- toast ---------- */
 .toasts{position:fixed;left:50%;transform:translateX(-50%);z-index:90;
   bottom:calc(var(--nav-h) + 84px + env(safe-area-inset-bottom));
-  display:flex;flex-direction:column;gap:8px;width:calc(100% - 32px);max-width:400px;pointer-events:none}
-@media(min-width:760px){.toasts{bottom:26px;left:26px;transform:none}}
-.toast{background:#33301F;color:#F6F1E4;font-size:13.5px;padding:11px 14px;border-radius:var(--r-sm);
-  box-shadow:var(--sh-2);animation:rise .2s ease;line-height:1.5}
-.toast.bad{background:#7C382C}
+  display:flex;flex-direction:column;gap:var(--s-3);width:calc(100% - 32px);max-width:400px;pointer-events:none}
+@media(min-width:760px){.toasts{bottom:var(--s-7);left:var(--s-7);transform:none}}
+.toast{background:var(--toast-bg);color:var(--toast-ink);font-size:var(--t-sm);padding:12px 15px;border-radius:var(--r-sm);
+  box-shadow:var(--sh-2);animation:rise var(--d-2) var(--e-out);line-height:1.55}
+.toast.bad{background:var(--toast-bad);color:var(--toast-bad-ink)}
 
-.schemabar{background:var(--hot-soft);border-bottom:1px solid #EBD3C4;color:#7E432A;
-  font-size:13px;line-height:1.65;padding:11px 16px;text-align:center}
-.schemabar b{display:block;font-size:14px;margin-bottom:2px}
-.schemabar code{background:rgba(126,67,42,.1);padding:1px 5px;border-radius:4px;
-  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.schemabar{background:var(--hot-soft);border-bottom:1px solid var(--hot-line);color:var(--hot-ink);
+  font-size:var(--t-sm);line-height:1.7;padding:12px var(--s-5);text-align:center}
+.schemabar b{display:block;font-size:var(--t-md);margin-bottom:2px}
+.schemabar code{background:var(--bg2);padding:1px 5px;border-radius:4px;
+  font-family:var(--mono);font-size:var(--t-xs)}
 
-/* setup screen */
-.setup{max-width:620px;margin:0 auto;padding:32px 18px 60px}
-.setup h1{font-size:21px;margin:0 0 6px}
-.setup p.lead{color:var(--ink2);font-size:14px;margin:0 0 22px;line-height:1.7}
-.setup ol{padding-left:20px;margin:0 0 22px;color:var(--ink2);font-size:14px;line-height:1.85}
-.setup code{background:var(--bg2);padding:2px 6px;border-radius:5px;font-size:12.5px;
-  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all}
+/* ---------- 初次設定 ---------- */
+.setup{max-width:640px;margin:0 auto;padding:var(--s-8) 18px 60px}
+.setup h1{font-size:var(--t-2xl);margin:0 0 var(--s-2)}
+.setup p.lead{color:var(--ink2);font-size:var(--t-md);margin:0 0 var(--s-7);line-height:1.75}
+.setup ol{padding-left:20px;margin:0 0 var(--s-7);color:var(--ink2);font-size:var(--t-md);line-height:1.9}
+.setup code{background:var(--bg2);padding:2px 6px;border-radius:5px;font-size:var(--t-xs);
+  font-family:var(--mono);word-break:break-all}
 .setup .box{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
-  padding:20px;box-shadow:var(--sh-1)}
+  padding:var(--s-6);box-shadow:var(--sh-1)}
 
 #nav-holder{padding-top:0;padding-bottom:10px}
 
-/* mobile nav */
+/* ---------- 手機 ---------- */
 @media(max-width:759px){
+  :root{--t-3xl:22px;--t-2xl:20px}
   #nav-holder{padding:0}
-  .page-head{flex-direction:column;align-items:flex-start;gap:3px}
-  .page-head p{min-width:0}
-  /* 有角落按鈕的頁首：標題與按鈕同一列，說明文字整列在下 */
-  .page-head.hasbtn{display:grid;grid-template-columns:1fr auto;align-items:center;gap:3px 10px}
-  .page-head.hasbtn h1{grid-area:1/1}
-  .page-head.hasbtn .ph-act{grid-area:1/2;margin:0}
-  .page-head.hasbtn p{grid-area:2/1/auto/-1}
-  main{padding-bottom:124px !important}
+  main{padding-bottom:126px !important}
   /* iOS 在字級小於 16px 的欄位聚焦時會自動放大版面，一律拉到 16px 擋掉 */
   .inp, .linkrow .inp, select.inp{font-size:16px}
   .dlist{max-height:none}   /* 手機讓整頁一起捲，避免巢狀捲動 */
   .nav{
     position:fixed;left:0;right:0;bottom:0;z-index:44;border-radius:0;
-    background:rgba(255,252,246,.96);backdrop-filter:blur(10px);
+    background:var(--nav-bg);backdrop-filter:blur(12px);
     border:none;border-top:1px solid var(--line);padding:7px 12px calc(7px + env(safe-area-inset-bottom));
-    gap:8px;box-shadow:0 -2px 14px rgba(78,64,40,.06);
+    gap:var(--s-3);box-shadow:0 -2px 14px rgba(0,0,0,.06);
   }
-  .nav button{height:44px;flex-direction:row;font-size:13.5px}
+  .nav button{height:46px;flex-direction:row;font-size:var(--t-sm)}
   .nav button.on{background:var(--accent-soft)}
   body.app-on{padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom))}
   .wrap{padding:0 13px}
-  .top-in{min-height:52px}
-  main{padding:16px 0 24px}
+  .top-in{min-height:54px}
+  main{padding:var(--s-5) 0 var(--s-7)}
+  .menu{right:13px;top:calc(54px + env(safe-area-inset-top))}
 }
 @media(min-width:760px){
   #nav-holder{
-    display:flex; position:sticky; top:calc(56px + env(safe-area-inset-top)); z-index:39;
+    display:flex; position:sticky; top:calc(58px + env(safe-area-inset-top)); z-index:39;
     background:var(--bg); padding-top:10px;
   }
   .nav{flex:0 0 auto}
   .nav button{flex:0 0 auto;padding:0 22px}
+  .page-head h1{font-size:var(--t-3xl)}
+}
+
+/* 使用者關掉動態效果時，只留狀態改變本身 */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms !important;animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;scroll-behavior:auto !important;
+  }
 }
 </style>
 </head>
@@ -604,7 +836,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <p class="hint" id="au-hint" style="text-align:center;margin-top:14px">登入狀態會記住，之後開啟不需重新登入。</p>
     <div style="text-align:center;margin-top:12px">
       <button class="linkbtn" id="au-forgot">忘記密碼？</button>
-      <button class="linkbtn hide" id="au-back">← 回到登入</button>
+      <button class="linkbtn hide" id="au-back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>回到登入</button>
     </div>
   </div>
 </section>
@@ -722,7 +954,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 
     <!-- PAGE 3 -->
     <section id="p-task" class="wrap hide">
-      <div class="page-head hasbtn">
+      <div class="page-head">
         <h1>近期任務</h1>
         <p>一次性的任務，依截止日分組。可加子任務逐項勾選；勾完成後會在這裡再留兩天，之後移入「已完成」。任務不會出現在月曆。</p>
         <button class="tbtn ph-act" id="go-done">
@@ -736,7 +968,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 
     <!-- PAGE 3b：已完成（由「近期任務」右上角進入） -->
     <section id="p-done" class="wrap hide">
-      <div class="page-head hasbtn">
+      <div class="page-head">
         <h1>已完成</h1>
         <p>完成滿兩天的任務會移到這裡，依完成日期由新到舊。點卡片可看內容，取消勾選就會回到「近期任務」。</p>
         <button class="tbtn ph-act" id="back-task">
@@ -797,7 +1029,24 @@ const diffDays = (a,b) => Math.round((parseYmd(a) - parseYmd(b))/86400000);
 const addDays = (s,n) => { const d=parseYmd(s); d.setDate(d.getDate()+n); return ymd(d); };
 const fmtDate = s => { const d=parseYmd(s); return `${d.getMonth()+1} 月 ${d.getDate()} 日`; };
 
-const STAR = '<span class="star" aria-label="重大事件">★</span>';
+/* ---------- 圖示 ----------
+   全站只用畫出來的 SVG，統一 24 格線、圓端點；不用 ★ ▸ ✓ 這類符號字，
+   那些會落到系統符號字體去，粗細與視覺大小跟其他圖示對不上。 */
+const SVG = (inner, extra='') =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${inner}</svg>`;
+const IC = {
+  star:  '<path d="M12 2.9l2.83 5.73 6.32.92-4.575 4.46 1.08 6.29L12 17.33l-5.655 2.97 1.08-6.29L2.85 9.55l6.32-.92z" fill="currentColor" stroke-width="1.5"/>',
+  check: '<path d="M4 12.5l5 5L20 6.5" stroke-width="3.4"/>',
+  next:  '<path d="M9 5l7 7-7 7" stroke-width="2.8"/>',
+  link:  '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+  sun:   '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.4v2.2M12 19.4v2.2M4.2 12H2M22 12h-2.2M6.3 6.3L4.8 4.8M19.2 19.2l-1.5-1.5M17.7 6.3l1.5-1.5M4.8 19.2l1.5-1.5"/>',
+  moon:  '<path d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1z"/>',
+  auto:  '<rect x="3" y="4" width="18" height="13" rx="2.4"/><path d="M8.5 21h7M12 17v4"/>',
+  plus:  '<path d="M12 5.5v13M5.5 12h13" stroke-width="2.4"/>',
+  back:  '<path d="M15 5l-7 7 7 7" stroke-width="2.6"/>'
+};
+const STAR = `<span class="star" role="img" aria-label="重大事件">${SVG(IC.star)}</span>`;
 function hexRgba(hex, a){
   const h = String(hex||'').replace('#','');
   const n = h.length === 3 ? h.split('').map(c=>c+c).join('') : h;
@@ -806,13 +1055,83 @@ function hexRgba(hex, a){
         b = parseInt(n.slice(4,6),16) || 0;
   return `rgba(${r},${g},${b},${a})`;
 }
-function catColor(name){
-  if(!name) return '#A79C88';
-  const c = state.categories.find(x=>x.name===name);
-  if(c && c.color) return c.color;
-  let h=0; for(const ch of name) h=(h*31+ch.charCodeAt(0))>>>0;
-  return PALETTE[h%PALETTE.length];
+/* 類別色是使用者自己挑的，多半是為淺色底挑的深色。深色主題直接沿用會糊在卡片裡，
+   所以統一把亮度提上來、彩度收一點，色相不動——認得出是同一個類別才是重點。 */
+function liftForDark(hex){
+  const h = String(hex||'').replace('#','');
+  const n = h.length === 3 ? h.split('').map(c=>c+c).join('') : h;
+  let r = (parseInt(n.slice(0,2),16)||0)/255,
+      g = (parseInt(n.slice(2,4),16)||0)/255,
+      b = (parseInt(n.slice(4,6),16)||0)/255;
+  const mx = Math.max(r,g,b), mn = Math.min(r,g,b), d = mx-mn;
+  let hu = 0;
+  if(d){
+    if(mx===r)      hu = ((g-b)/d + (g<b?6:0));
+    else if(mx===g) hu = (b-r)/d + 2;
+    else            hu = (r-g)/d + 4;
+    hu /= 6;
+  }
+  let l = (mx+mn)/2;
+  let sa = d ? d / (1 - Math.abs(2*l - 1)) : 0;
+  if(l >= .62) return hex;                       // 本來就夠亮就不動
+  l  = .68;
+  sa = Math.min(sa, .5);
+  const q = l < .5 ? l*(1+sa) : l + sa - l*sa, pp = 2*l - q;
+  const ch = t => {
+    t = (t+1)%1;
+    if(t < 1/6) return pp + (q-pp)*6*t;
+    if(t < 1/2) return q;
+    if(t < 2/3) return pp + (q-pp)*(2/3 - t)*6;
+    return pp;
+  };
+  const hx = v => Math.round(Math.min(1,Math.max(0,v))*255).toString(16).padStart(2,'0');
+  return '#' + hx(ch(hu+1/3)) + hx(ch(hu)) + hx(ch(hu-1/3));
 }
+const isDarkMode = () => document.documentElement.classList.contains('is-dark');
+function catColor(name){
+  let base;
+  if(!name) base = '#A79C88';
+  else {
+    const c = state.categories.find(x=>x.name===name);
+    if(c && c.color) base = c.color;
+    else {
+      let h=0; for(const ch of name) h=(h*31+ch.charCodeAt(0))>>>0;
+      base = PALETTE[h%PALETTE.length];
+    }
+  }
+  return isDarkMode() ? liftForDark(base) : base;
+}
+/* ---------- 主題 ----------
+   三段：跟隨系統／淺色／深色。深色不是把顏色反過來，是另一組暖墨色票；
+   類別色也會跟著換算，所以切換後要重畫一次。 */
+const THEME_KEY = 'todo.theme';
+const THEME_BG  = { light:'#F3EDE0', dark:'#15130E' };
+const prefersDark = () => window.matchMedia('(prefers-color-scheme:dark)').matches;
+function themeMode(){
+  try{ const v = localStorage.getItem(THEME_KEY); if(v==='light'||v==='dark') return v; }catch(e){}
+  return 'auto';
+}
+function applyTheme(mode, repaint){
+  const root = document.documentElement;
+  if(mode==='light' || mode==='dark') root.setAttribute('data-theme', mode);
+  else root.removeAttribute('data-theme');
+  try{
+    if(mode==='auto') localStorage.removeItem(THEME_KEY);
+    else localStorage.setItem(THEME_KEY, mode);
+  }catch(e){}
+  const dark = mode==='dark' || (mode==='auto' && prefersDark());
+  root.classList.toggle('is-dark', dark);
+  const mt = document.getElementById('mt-theme');
+  if(mt) mt.setAttribute('content', dark ? THEME_BG.dark : THEME_BG.light);
+  if(repaint && typeof render === 'function' && state.schedules) render();
+}
+function initTheme(){
+  applyTheme(themeMode(), false);
+  window.matchMedia('(prefers-color-scheme:dark)').addEventListener('change', ()=>{
+    if(themeMode()==='auto') applyTheme('auto', true);
+  });
+}
+
 function normUrl(u){
   u = String(u||'').trim();
   if(!u) return '';
@@ -1254,6 +1573,7 @@ function deleteTask(id){
 }
 /** 勾完成／取消完成。重新勾一次會換上新的完成日，兩天重新算起。 */
 function setTaskDone(t, done){
+  popKey = done ? t.id : null;
   saveTask({ ...t, done, completed_at: done ? new Date().toISOString() : null });
 }
 /** 切換第 i 個子任務，回傳更新後的任務 */
@@ -1261,11 +1581,18 @@ function toggleSub(id, i){
   const t = state.tasks.find(x=>x.id===id);
   if(!t) return null;
   const row = { ...t, subtasks: taskSubs(t).map((x,k)=> k===i ? {...x, done: !x.done} : x) };
+  popKey = row.subtasks[i].done ? t.id + '#' + i : null;
   saveTask(row);
   return row;
 }
+/* 勾完成時記下是哪一筆，重畫後只讓那一筆播動畫；
+   否則整頁的已完成項目每次重畫都會一起跳。 */
+let popKey = null;
+const takePop = k => { const hit = popKey === k; if(hit) popKey = null; return hit ? ' pop' : ''; };
+
 function toggleDone(itemId, kind, date){
   const cur = state.doneIndex.get(doneKey(itemId,date));
+  popKey = cur ? null : doneKey(itemId,date);
   if(cur){
     state.completions = state.completions.filter(c=>c.id!==cur.id);
     rebuildDoneIndex(); saveCache();
@@ -1306,7 +1633,7 @@ function renderChipBar(box, rows, filter, impOnly, onChange){
   if(!cats.length && !anyImp){ box.classList.add('hide'); box.innerHTML=''; return; }
   box.classList.remove('hide');
   box.innerHTML = `<button class="chip ${(filter===null && !impOnly)?'on':''}" data-c="">全部</button>` +
-    (anyImp?`<button class="chip ${impOnly?'on':''}" data-imp="1">★ 重大</button>`:'') +
+    (anyImp?`<button class="chip ${impOnly?'on':''}" data-imp="1">${STAR}重大</button>`:'') +
     cats.map(c=>`<button class="chip ${filter===c?'on':''}" data-c="${esc(c)}">
       <i class="cd" style="background:${catColor(c)}"></i>${esc(c)}</button>`).join('');
   $$('.chip', box).forEach(b=>b.onclick = ()=>{
@@ -1330,13 +1657,34 @@ function renderTaskFilters(){
     });
 }
 
+/* ---------- 節奏條 ----------
+   這個 App 真正獨有的內容是「重複」本身。whenLabel() 說得出規則，
+   但說不出疏密；把未來幾週的實際落點畫出來就看得出來了。
+   從今天起算，所以每 7 格一組時同一個星期幾永遠落在同一個位置。 */
+function cadenceHTML(s, weeks){
+  weeks = weeks || 4;
+  const today = todayStr();
+  let n = 0, out = '';
+  for(let w = 0; w < weeks; w++){
+    let ticks = '';
+    for(let i = 0; i < 7; i++){
+      const k = w*7 + i, on = occursOn(s, addDays(today, k));
+      if(on) n++;
+      ticks += `<i class="${on?'on':''}${k===0?' now':''}"></i>`;
+    }
+    out += `<b>${ticks}</b>`;
+  }
+  const label = n ? `接下來 ${weeks} 週共 ${n} 次` : `接下來 ${weeks} 週沒有安排`;
+  return { n, label,
+    html:`<span class="cadence" style="--c:${catColor(s.category)}" role="img" aria-label="${label}">${out}</span>` };
+}
+
 function itemCardHTML(s){
   const links = Array.isArray(s.links) ? s.links : [];
   const today = todayStr();
   const ended   = s.end_date && s.end_date < today;
   const pending = s.start_date && s.start_date > today;
   return `<button class="item ${ended?'ended':''} ${s.important?'imp':''}" data-id="${esc(s.id)}">
-    <span class="bar" style="background:${catColor(s.category)}"></span>
     <span class="bd">
       <span class="ti">${s.important?STAR:''}${esc(s.title)}</span>
       <span class="mt">
@@ -1345,9 +1693,10 @@ function itemCardHTML(s){
           :pending?`<span class="tag soon">${esc(rangeLabel(s))}</span>`
           :s.end_date?`<span class="tag">至 ${esc(fmtDate(s.end_date))}</span>`:''}
         ${s.category?`<span class="tag"><i class="cd" style="background:${catColor(s.category)}"></i>${esc(s.category)}</span>`:''}
-        ${links.length?`<span class="tag lk">連結 ${links.length}</span>`:''}
+        ${links.length?`<span class="tag lk">${SVG(IC.link)}連結 ${links.length}</span>`:''}
       </span>
       ${s.description?`<span class="desc">${esc(s.description)}</span>`:''}
+      ${cadenceHTML(s).html}
     </span>
   </button>`;
 }
@@ -1393,7 +1742,7 @@ function renderList(){
       <div class="cards">${g.map(itemCardHTML).join('')}</div>
     </section>`;
   }
-  body.innerHTML = html;
+  body.innerHTML = `<div class="board">${html}</div>`;
   $$('.item', body).forEach(b=>b.onclick = ()=>{
     const s = state.schedules.find(x=>x.id===b.dataset.id);
     if(s) openDetail({kind:'schedule', row:s, mode:'edit'});
@@ -1436,8 +1785,13 @@ function weekBars(weekStart){
   return { drawn, laneCount: lanes.length, spillIds: new Set(spill.map(s=>s.e.id)) };
 }
 
+/* 一格最多放幾筆晶片。大螢幕多出來的寬度是拿去讓標題讀得完整，
+   不是多塞一列——多一列會撐破格子高度，反而被裁掉。 */
+const CELL_CHIPS = 3;
+
 function renderCal(){
   const y = state.calY, m = state.calM;
+  const LIM = CELL_CHIPS;
   $('#cal-mo').textContent = `${y} 年 ${m+1} 月`;
 
   const first = new Date(y, m, 1);
@@ -1485,20 +1839,20 @@ function renderCal(){
       const im = it.row.important ? ' imp' : '';
       return `<i class="${done?'done':''}${ev}${im}" style="${done?`color:${col}`:`background:${col}`}"></i>`;
     }).join('');
-    const chips = shown.slice(0,3).map(it=>{
+    const chips = shown.slice(0,LIM).map(it=>{
       const done = isDone(it.row.id, ds);
       const col = catColor(it.row.category);
       const st = it.row.important ? STAR : '';
       const t = (it.row.time_text?it.row.time_text+' ':'') + it.row.title;
       if(it.kind !== 'event'){
-        return `<span class="cchip ${done?'done':''}" style="border-left-color:${col}">${st}${esc(t)}</span>`;
+        return `<span class="cchip ${done?'done':''}" style="--c:${col}">${st}${esc(t)}</span>`;
       }
       const cont = it.span > 1 ? ` ${it.first?'st':''}${it.last?'en':''}${!it.first&&!it.last?'mid':''}` : '';
       const style = `--c:${col};--c-soft:${hexRgba(col,.15)};--c-line:${hexRgba(col,.42)}`;
       return `<span class="cchip evt${cont} ${done?'done':''}" style="${style}">${
-        it.span>1 && !it.first ? '<b class="cnt">▸</b>' : ''}${st}${esc(t)}</span>`;
+        it.span>1 && !it.first ? SVG(IC.next, 'class="cnt"') : ''}${st}${esc(t)}</span>`;
     }).join('');
-      const more = items.length>3 ? `<span class="cmore">+${items.length-3}</span>` : '';
+      const more = items.length>LIM ? `<span class="cmore">+${items.length-LIM}</span>` : '';
       cells.push(`<button class="cell ${out?'out':''} ${ds===today?'today':''} ${ds===state.selDate?'sel':''}" data-d="${ds}">
         <span class="dn">${d.getDate()}</span>
         <span class="dots">${dots}</span>
@@ -1559,7 +1913,7 @@ function renderDay(){
     const kindTag = ev
       ? `<span class="tag ev">${it.span>1?`多日行程 第 ${it.dayIndex}/${it.span} 天`:'單一行程'}</span>`
       : `<span class="tag">${esc(whenLabel(r))}</span>`;
-    return `<div class="drow ${ev?'evt':''} ${r.important?'imp':''} ${dn?'done':''}" data-id="${esc(r.id)}" data-k="${it.kind}" style="${style}">
+    return `<div class="drow ${ev?'evt':''} ${r.important?'imp':''} ${dn?'done':''}${takePop(doneKey(r.id, ds))}" data-id="${esc(r.id)}" data-k="${it.kind}" style="${style}">
       <button class="ck ${dn?'on':''}" data-act="ck" aria-label="標記完成">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>
       </button>
@@ -1602,18 +1956,17 @@ function taskCardHTML(t){
   const di = dueInfo(t);
   const col = catColor(t.category);
   const dd = taskDoneDate(t);
-  return `<div class="item task ${t.done?'done':''} ${t.important?'imp':''}" data-id="${esc(t.id)}">
-    <span class="bar" style="background:${col}"></span>
+  return `<div class="item task ${t.done?'done':''} ${t.important?'imp':''}${takePop(t.id)}" data-id="${esc(t.id)}" style="--c:${col}">
     <button class="ck ${t.done?'on':''}" data-act="ck" aria-label="${t.done?'取消完成':'標記完成'}">${CK_SVG}</button>
     <button class="bd" data-act="open">
       <span class="ti">${t.important?STAR:''}${esc(t.title)}</span>
-      ${(!t.done && nx)?`<span class="nextsub"><b>▸</b><em>${esc(nx.title)}</em></span>`:''}
+      ${(!t.done && nx)?`<span class="nextsub">${SVG(IC.next)}<em>${esc(nx.title)}</em></span>`:''}
       <span class="mt">
         ${t.done
-          ? `<span class="tag did">✓ ${dd?esc(fmtDate(dd))+' 完成':'已完成'}</span>`
+          ? `<span class="tag did">${SVG(IC.check)}${dd?esc(fmtDate(dd))+' 完成':'已完成'}</span>`
           : `<span class="tag ${DUE_CLS[di.k]}">${esc(di.label)}</span>`}
         ${t.category?`<span class="tag"><i class="cd" style="background:${col}"></i>${esc(t.category)}</span>`:''}
-        ${links.length?`<span class="tag lk">連結 ${links.length}</span>`:''}
+        ${links.length?`<span class="tag lk">${SVG(IC.link)}連結 ${links.length}</span>`:''}
       </span>
       ${m?`<span class="pgs">
         <span class="pips">${subs.map(x=>`<i class="${x.done?'on':''}"></i>`).join('')}</span>
@@ -1673,7 +2026,7 @@ function renderTasks(){
     const list = rows.filter(t=>taskBucket(t)===g.k).sort(g.k==='did' ? cmpDone : cmpTask);
     if(list.length) html += groupHTML(g.label, list, g.note);
   }
-  body.innerHTML = html;
+  body.innerHTML = `<div class="board">${html}</div>`;
   wireTaskCards(body);
 }
 
@@ -1695,7 +2048,7 @@ function renderDone(){
     if(!g) groups.push(g = { key, label: d ? `${d.slice(0,4)} 年 ${Number(d.slice(5,7))} 月` : '沒有完成日期', list:[] });
     g.list.push(t);
   }
-  body.innerHTML = groups.map(g=>groupHTML(g.label, g.list)).join('');
+  body.innerHTML = `<div class="board">${groups.map(g=>groupHTML(g.label, g.list)).join('')}</div>`;
   wireTaskCards(body);
 }
 
@@ -1710,7 +2063,7 @@ function openTaskDetail(task){
     const col = catColor(t.category);
     const { n, m } = taskProgress(t);
     const di = dueInfo(t);
-    return `${t.important?`<span class="tag imp">★ 重大事件</span>`:''}
+    return `${t.important?`<span class="tag imp">${STAR}重大事件</span>`:''}
       <span class="tag ${t.done?'did':DUE_CLS[di.k]}">${t.due_date
         ? `截止 ${esc(fmtDate(t.due_date))}（週${WD[parseYmd(t.due_date).getDay()]}）`
         : '未定截止日'}</span>
@@ -1736,11 +2089,11 @@ function openTaskDetail(task){
     const { n, m } = taskProgress(t);
     return `<div class="dv-sec">
       <h3>子任務</h3>
-      <div class="pgs" style="margin:0 0 9px">
+      <div class="pgs" style="margin:0 0 9px;--c:${catColor(t.category)}">
         <span class="pips">${a.map(x=>`<i class="${x.done?'on':''}"></i>`).join('')}</span>
         <span class="pn ${n===m?'full':''}">${n}/${m}</span>
       </div>
-      ${a.map((x,i)=>`<button class="sub ${x.done?'on':''}" data-i="${i}">
+      ${a.map((x,i)=>`<button class="sub ${x.done?'on':''}${takePop(t.id + '#' + i)}" data-i="${i}">
         <span class="ck ${x.done?'on':''}" style="pointer-events:none">${CK_SVG}</span>
         <span class="st">${esc(x.title)}</span></button>`).join('')}
     </div>`;
@@ -1810,7 +2163,7 @@ function subRowHTML(x){
 }
 function subsFieldHTML(subs){
   return `<div id="f-subs">${(subs||[]).map(subRowHTML).join('')}</div>
-    <button type="button" class="addlink" id="f-addsub">＋ 新增子任務</button>`;
+    <button type="button" class="addlink" id="f-addsub">${SVG(IC.plus)}新增子任務</button>`;
 }
 /** 把某一列往上（-1）或往下（+1）挪一格 */
 function moveSubRow(row, dir){
@@ -1900,7 +2253,7 @@ function openTaskForm(existing){
     <div class="fld"><label for="f-cat">類別</label>${catSelectHTML(t.category)}</div>
     ${impToggleHTML(t.important)}
     <div class="fld"><label>子任務（選填）</label>${subsFieldHTML(taskSubs(t))}
-      <p class="hint">填了子任務，卡片上會用綠色小方塊顯示完成度，標題下也會顯示第一個還沒完成的。
+      <p class="hint">填了子任務，卡片上會用類別顏色的小方塊顯示完成度，標題下也會顯示第一個還沒完成的。
         按住左邊的握把可<b>拖曳調整順序</b>（聚焦握把後用 ↑ ↓ 也可以）。
         這裡只改名稱、順序與增刪，勾選在卡片的詳細內容裡。</p></div>
     <div class="fld"><label for="f-desc">敘述（選填）</label>
@@ -1995,7 +2348,7 @@ function openDetail({kind, row, mode, date}){
   const rl = isEvt ? '' : rangeLabel(row);
 
   let body = `<div class="dv-badges">
-    ${row.important?`<span class="tag imp">★ 重大事件</span>`:''}
+    ${row.important?`<span class="tag imp">${STAR}重大事件</span>`:''}
     <span class="tag time">${esc(when)}${row.time_text?' · '+esc(row.time_text):''}</span>
     ${rl?`<span class="tag">${esc(rl)}</span>`:''}
     ${row.category?`<span class="tag"><i class="cd" style="background:${col}"></i>${esc(row.category)}</span>`:''}
@@ -2003,6 +2356,14 @@ function openDetail({kind, row, mode, date}){
       ? `<span class="tag ev" style="${evStyle}">${span>1?`多日行程 · ${span} 天`:'單一行程'}</span>`
       : `<span class="tag">重複排程</span>`}
   </div>`;
+
+  if(!isEvt){
+    const cad = cadenceHTML(row, 6);
+    body += `<div class="dv-cad">
+      <div class="cap"><span>接下來六週的落點</span><b>${cad.n} 次</b></div>
+      ${cad.html}
+    </div>`;
+  }
 
   if(mode==='calendar'){
     const dn = isDone(row.id, date);
@@ -2070,7 +2431,7 @@ function openDetail({kind, row, mode, date}){
 function impToggleHTML(on){
   return `<div class="fld">
     <button type="button" class="impbtn" id="f-imp" aria-pressed="${on?'true':'false'}">
-      <span class="bigstar">★</span>
+      ${SVG(IC.star, 'class="bigstar"')}
       <span class="tx"><b>標記為重大事件</b><small>清單置頂並加上星號，月曆上也會標示出來</small></span>
       <span class="sw"><i></i></span>
     </button></div>`;
@@ -2087,13 +2448,21 @@ function catSelectHTML(cur){
   return `<select class="inp" id="f-cat">
     <option value="">（不分類）</option>
     ${names.map(n=>`<option value="${esc(n)}" ${n===cur?'selected':''}>${esc(n)}</option>`).join('')}
-    <option value="__new__">＋ 新增類別…</option>
-  </select>`;
+    <option value="__new__">新增類別…</option>
+  </select>
+  <div class="linkrow hide" id="f-cat-new" style="margin-top:8px">
+    <input class="inp" id="f-cat-name" placeholder="新類別名稱" maxlength="20"
+           autocapitalize="off" autocorrect="off" spellcheck="false">
+    <button type="button" class="btn" id="f-cat-ok">加入</button>
+    <button type="button" class="xbtn" id="f-cat-x" aria-label="取消新增類別">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>`;
 }
 function linksHTML(links){
   const rows = (links && links.length ? links : []).map(l=>linkRowHTML(l)).join('');
   return `<div id="f-links">${rows}</div>
-    <button type="button" class="addlink" id="f-addlink">＋ 新增連結</button>`;
+    <button type="button" class="addlink" id="f-addlink">${SVG(IC.plus)}新增連結</button>`;
 }
 function linkRowHTML(l){
   l = l || {name:'', url:''};
@@ -2122,24 +2491,40 @@ function readLinks(root){
   })).filter(l=>l.url).map(l=>({ name: l.name || l.url, url: normUrl(l.url) }));
 }
 function wireCat(root){
-  const sel = $('#f-cat', root);
+  const sel  = $('#f-cat', root);
+  const box  = $('#f-cat-new', root);
+  const name = $('#f-cat-name', root);
   let prev = sel.value;
+
+  /* 選到「新增類別…」就在原地展開一列輸入，不叫系統的 prompt——
+     那顆對話框在這套介面裡格格不入，iOS 加到主畫面後還可能整個被擋掉。 */
+  const cancel = ()=>{ box.classList.add('hide'); name.value=''; sel.value = prev; };
+  const commit = ()=>{
+    const ok = addCategory(name.value);
+    if(!ok){ name.focus(); return; }
+    if(![...sel.options].some(o=>o.value===ok)){
+      const opt = document.createElement('option');
+      opt.value = ok; opt.textContent = ok;
+      sel.insertBefore(opt, sel.lastElementChild);
+    }
+    sel.value = ok; prev = ok;
+    box.classList.add('hide'); name.value = '';
+    renderFilters();
+  };
   sel.onchange = ()=>{
     if(sel.value === '__new__'){
-      const name = prompt('新類別名稱（例：工作、私人）');
-      const ok = name ? addCategory(name) : null;
-      if(ok){
-        sel.insertAdjacentHTML('afterbegin','');
-        const opt = document.createElement('option');
-        opt.value = ok; opt.textContent = ok;
-        sel.insertBefore(opt, sel.lastElementChild);
-        sel.value = ok;
-        renderFilters();
-      }else{
-        sel.value = prev;
-      }
+      box.classList.remove('hide');
+      name.focus();
+      return;                       // prev 保持在原本的選擇，取消時才回得去
     }
+    box.classList.add('hide');
     prev = sel.value;
+  };
+  $('#f-cat-ok', root).onclick = commit;
+  $('#f-cat-x',  root).onclick = cancel;
+  name.onkeydown = e=>{
+    if(e.key==='Enter'){ e.preventDefault(); commit(); }
+    if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); cancel(); }
   };
 }
 function showFormErr(root, msg){
@@ -2175,7 +2560,7 @@ function openScheduleForm(existing){
       </div></div>
     <div class="fld hide" id="w-custom"><label>間隔</label>
       <div style="display:flex;gap:8px;align-items:center">
-        <span style="font-size:14px;color:var(--ink2);flex:none">每</span>
+        <span style="font-size:var(--t-md);color:var(--ink2);flex:none">每</span>
         <select id="f-int" class="inp" style="flex:0 0 84px">
           ${Array.from({length:12},(_,i)=>i+1).map(n=>`<option value="${n}" ${Number(legacy2w?2:s.interval_n||2)===n?'selected':''}>${n}</option>`).join('')}
         </select>
@@ -2365,21 +2750,30 @@ function openEventForm(existing, presetDate){
    ============================================================ */
 function openCatManager(){
   const draw = () => state.categories.length
-    ? state.categories.map(c=>`<div class="drow" data-id="${esc(c.id)}">
-        <span class="tag" style="background:${c.color}22;color:${c.color};font-weight:600">
-          <i class="cd" style="background:${c.color}"></i>${esc(c.name)}</span>
+    ? state.categories.map(c=>{
+        const col = catColor(c.name);
+        return `<div class="drow" data-id="${esc(c.id)}">
+        <span class="tag" style="background:${hexRgba(col,.14)};font-weight:600;box-shadow:inset 0 0 0 1px ${hexRgba(col,.45)}">
+          <i class="cd" style="background:${col}"></i>${esc(c.name)}</span>
         <span style="flex:1"></span>
-        <button class="xbtn" data-rm aria-label="刪除">
+        <button class="xbtn" data-rm aria-label="刪除 ${esc(c.name)}">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-        </button></div>`).join('')
+        </button></div>`;
+      }).join('')
     : `<div class="dnone">還沒有類別。</div>`;
 
+  /* 新增改成就地的輸入列。原本用 window.prompt，那顆系統對話框在這個
+     已經整套上色的介面裡看起來像掉進另一個 App，而且 iOS 主畫面模式常被擋掉。 */
   const m = modal({
     title:'管理類別',
     body:`<div id="cat-box" style="display:flex;flex-direction:column;gap:6px">${draw()}</div>
+          <div class="linkrow" style="margin-top:12px">
+            <input id="cat-new" class="inp" placeholder="新類別名稱" maxlength="20"
+                   autocapitalize="off" autocorrect="off" spellcheck="false">
+            <button class="btn" data-add>新增</button>
+          </div>
           <p class="hint">刪除類別不會刪掉排程，只是移除這個標籤選項。</p>`,
-    footer:`<button class="btn" data-add>＋ 新增類別</button><span class="sp"></span>
-            <button class="btn pri" data-x2>完成</button>`
+    footer:`<span class="sp"></span><button class="btn pri" data-x2>完成</button>`
   });
   const R = m.ov;
   const wire = ()=>{
@@ -2392,10 +2786,16 @@ function openCatManager(){
     });
   };
   wire();
-  $('[data-add]', R).onclick = ()=>{
-    const n = prompt('新類別名稱');
-    if(n && addCategory(n)){ $('#cat-box', R).innerHTML = draw(); wire(); renderFilters(); }
+  const inp = $('#cat-new', R);
+  const add = ()=>{
+    if(!addCategory(inp.value)) { inp.focus(); return; }
+    inp.value = '';
+    $('#cat-box', R).innerHTML = draw(); wire();
+    renderFilters(); render();
+    inp.focus();
   };
+  $('[data-add]', R).onclick = add;
+  inp.onkeydown = e=>{ if(e.key==='Enter'){ e.preventDefault(); add(); } };
   $('[data-x2]', R).onclick = m.close;
 }
 
@@ -2407,10 +2807,19 @@ function closeMenu(){ if(menuEl){ menuEl.remove(); menuEl = null; document.remov
 function onDocClick(e){ if(menuEl && !menuEl.contains(e.target) && e.target.closest('#btn-menu')===null) closeMenu(); }
 function openMenu(){
   if(menuEl){ closeMenu(); return; }
+  const tm = themeMode();
   menuEl = document.createElement('div');
   menuEl.className = 'menu';
   menuEl.innerHTML = `
     <div class="who"><b>${esc(session?.user?.email||'')}</b><span>已登入，資料自動同步</span></div>
+    <div class="thm"><span>外觀</span>
+      <div class="thmseg" id="thm">
+        <button data-t="auto"  class="${tm==='auto' ?'on':''}">${SVG(IC.auto)}系統</button>
+        <button data-t="light" class="${tm==='light'?'on':''}">${SVG(IC.sun)}淺色</button>
+        <button data-t="dark"  class="${tm==='dark' ?'on':''}">${SVG(IC.moon)}深色</button>
+      </div>
+    </div>
+    <div class="sep"></div>
     <button data-a="cats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0l-7-7A2 2 0 0 1 3 12.2V5a2 2 0 0 1 2-2h7.2a2 2 0 0 1 1.4.6l7 7a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor"/></svg>管理類別</button>
     <button data-a="sync"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.5M4 13a8 8 0 0 0 14.3 4.5"/><path d="M20 4v4h-4M4 20v-4h4"/></svg>立即重新同步</button>
     <button data-a="import"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M8 7l4-4 4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>匯入 JSON</button>
@@ -2420,6 +2829,10 @@ function openMenu(){
   document.body.appendChild(menuEl);
   setTimeout(()=>document.addEventListener('click', onDocClick, true), 0);
 
+  $$('#thm button', menuEl).forEach(b=>b.onclick = ()=>{
+    applyTheme(b.dataset.t, true);
+    $$('#thm button', menuEl).forEach(x=>x.classList.toggle('on', x===b));
+  });
   menuEl.querySelector('[data-a=cats]').onclick   = ()=>{ closeMenu(); openCatManager(); };
   menuEl.querySelector('[data-a=sync]').onclick   = async ()=>{ closeMenu(); await flushQueue(); await pullAll(); toast('已重新同步'); };
   menuEl.querySelector('[data-a=import]').onclick = ()=>{ closeMenu(); openImportMenu(); };
@@ -2611,8 +3024,8 @@ function openImportMenu(){
     box.innerHTML = list.map((it,i)=>
       `<button class="btn wide" data-b="${i}" style="justify-content:flex-start;height:auto;padding:11px 14px;text-align:left">
         <span style="display:block">
-          <span style="display:block;font-size:14.5px">${esc(it.title)}</span>
-          <span style="display:block;font-size:12px;color:var(--muted);font-weight:400;margin-top:2px">${esc(it.description||'')}</span>
+          <span style="display:block;font-size:var(--t-lg)">${esc(it.title)}</span>
+          <span style="display:block;font-size:var(--t-xs);color:var(--muted);font-weight:400;margin-top:2px">${esc(it.description||'')}</span>
         </span>
       </button>`).join('');
     $$('[data-b]', box).forEach(b=>b.onclick = async ()=>{
@@ -2957,6 +3370,7 @@ function demoClient(){
 const DEMO_SESSION = { user:{ id:'demo-user', email:'試用模式（僅存在本機）' } };
 
 (async function main(){
+  initTheme();
   if(new URLSearchParams(location.search).get('demo') === '1'){
     sb = demoClient();
     session = DEMO_SESSION;
