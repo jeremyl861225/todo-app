@@ -464,6 +464,8 @@ span.star svg{width:100%;height:100%;display:block}
   display:grid;place-items:center;border-radius:50%;flex:none}
 .cell.today .dn{background:var(--hot);color:var(--on-hot)}
 .cell.sel{background:var(--accent-soft)}
+/* 選取格的底色比一般格深一階，日期用 ink2 會剛好掉到 4.5 以下 */
+.cell.sel .dn{color:var(--ink)}
 .cell.sel::after{content:"";position:absolute;inset:0;border:2px solid var(--accent);
   border-radius:2px;pointer-events:none}
 .dots{display:flex;flex-wrap:wrap;gap:3px;padding:0 1px}
@@ -595,7 +597,9 @@ span.star svg{width:100%;height:100%;display:block}
 .btn.dg:hover{background:var(--danger-soft);border-color:var(--danger);color:var(--danger)}
 .btn.wide{width:100%}
 .btn svg{width:16px;height:16px}
-.btn:disabled{opacity:.5;pointer-events:none}
+/* 停用態不要用 opacity——這顆按鈕的字本身就是提示，壓半透明會讀不到 */
+.btn:disabled{background:var(--bg2);border-color:var(--line);color:var(--ink2);
+  box-shadow:none;pointer-events:none}
 
 /* ---------- 表單 ---------- */
 .fld{margin:0 0 var(--s-5)}
@@ -649,6 +653,8 @@ select.inp{appearance:none;background-image:var(--sel-arrow);
 /* 那天已經有東西了，排的時候看得到 */
 .mdp-grid button i{width:4px;height:4px;border-radius:50%;background:var(--muted);display:block}
 .mdp-grid button.on i{background:var(--on-accent);opacity:.75}
+.mdp-grid button.blk{color:var(--muted);text-decoration:line-through;cursor:default}
+.mdp-grid button.blk:hover{background:transparent}
 .mdp-sum{font-size:var(--t-xs);color:var(--muted);margin:var(--s-2) 0 0;line-height:1.65}
 .mdp-sum b{color:var(--ink2);font-weight:700}
 .mdp-sum.multi b{color:var(--accent-ink)}
@@ -684,6 +690,16 @@ select.inp{appearance:none;background-image:var(--sel-arrow);
 .hint{font-size:var(--t-xs);color:var(--muted);margin:var(--s-2) 0 0;line-height:1.6}
 .err{font-size:var(--t-sm);color:var(--danger);background:var(--danger-soft);border:1px solid var(--danger-line);
   border-radius:var(--r-sm);padding:10px 12px;margin:0 0 var(--s-4);line-height:1.6}
+
+/* 單次挪動：只改這一次的日期，重複規則不動 */
+.mv-now{font-size:var(--t-sm);color:var(--ink2);margin:0 0 10px;line-height:1.65}
+.mv-now b{font-weight:700;color:var(--ink)}
+.mv-now .from{color:var(--muted);text-decoration:line-through}
+.mv-act{display:flex;gap:var(--s-2);flex-wrap:wrap}
+.mv-act .btn{flex:1;min-width:130px}
+.mv-pick{margin-top:var(--s-4)}
+.mv-pick .mv-act{margin-top:var(--s-4)}
+.tag.mv{background:var(--hot-soft);color:var(--hot-ink);font-weight:600}
 
 /* ---------- 詳細內容 ---------- */
 .dv-badges{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 var(--s-5)}
@@ -1056,6 +1072,8 @@ const daysInMonth = (y,m) => new Date(y,m+1,0).getDate();
 const diffDays = (a,b) => Math.round((parseYmd(a) - parseYmd(b))/86400000);
 const addDays = (s,n) => { const d=parseYmd(s); d.setDate(d.getDate()+n); return ymd(d); };
 const fmtDate = s => { const d=parseYmd(s); return `${d.getMonth()+1} 月 ${d.getDate()} 日`; };
+const mdDate  = s => { const d=parseYmd(s); return `${d.getMonth()+1}/${d.getDate()}`; };
+const wdOf    = s => `週${WD[parseYmd(s).getDay()]}`;
 
 /* ---------- 圖示 ----------
    全站只用畫出來的 SVG，統一 24 格線、圓端點；不用 ★ ▸ ✓ 這類符號字，
@@ -1245,6 +1263,77 @@ function occursOn(s, dateStr){
   }
   return false;
 }
+/* ---------- 單次改期 ----------
+   重複排程偶爾要挪一次：本來每週一，這週一有刀所以查房移到週二。
+   規則本身不能動（動了會影響所有的以後），所以改期記在排程的 moves 例外表：
+     { "原本的日期": "改到的日期" }
+   只有 from 那天真的是這條排程的落點時，這筆例外才算數——規則後來被改掉時
+   舊的例外就自動失效，不必回頭清理。 */
+const schedMoves = s => (s && s.moves && typeof s.moves === 'object' && !Array.isArray(s.moves)) ? s.moves : {};
+
+/** 這條排程原本落在 from，被挪到哪一天？沒挪就是 null */
+function moveTargetOf(s, from){
+  const to = schedMoves(s)[from];
+  return (isYmd(to) && to !== from) ? to : null;
+}
+/** 今天出現在 shown 的這一筆，原本是哪一天挪過來的？不是挪過來的就是 null */
+function moveOriginOf(s, shown){
+  const m = schedMoves(s);
+  for(const from in m){
+    if(m[from] === shown && from !== shown && occursOn(s, from)) return from;
+  }
+  return null;
+}
+/** 這條排程在某一天會不會出現（把單次改期算進去） */
+function schedShowsOn(s, ds){
+  // 原本就落在這天，而且沒被挪走
+  if(occursOn(s, ds) && !moveTargetOf(s, ds)) return { on:true, origin:ds, moved:false };
+  // 或者是從別天挪過來的
+  const from = moveOriginOf(s, ds);
+  if(from) return { on:true, origin:from, moved:true };
+  return { on:false };
+}
+/** 規則改了以後，落點不存在的例外就沒有意義了，存檔時順手清掉 */
+function pruneMoves(row){
+  const out = {};
+  const m = schedMoves(row);
+  for(const from in m){
+    const to = m[from];
+    if(isYmd(from) && isYmd(to) && to !== from && occursOn(row, from)) out[from] = to;
+  }
+  return out;
+}
+function normMoves(v){
+  const out = {};
+  if(v && typeof v === 'object' && !Array.isArray(v)){
+    for(const k in v) if(isYmd(k) && isYmd(v[k]) && v[k] !== k) out[k] = v[k];
+  }
+  return out;
+}
+
+/** 完成紀錄是綁在日期上的，改期時要跟著搬，否則「已經做過」會憑空消失 */
+function shiftCompletion(itemId, from, to){
+  const cur = state.doneIndex.get(doneKey(itemId, from));
+  if(!cur) return;
+  if(state.doneIndex.has(doneKey(itemId, to))){        // 目的地已經有紀錄就只刪來源
+    state.completions = state.completions.filter(c=>c.id !== cur.id);
+    enqueue({type:'delete', table:'completions', id:cur.id});
+  }else{
+    cur.occur_date = to;
+    enqueue({type:'upsert', table:'completions', row:{...cur}});
+  }
+  rebuildDoneIndex();
+}
+/** to 傳 null 表示取消改期，移回原本的日期 */
+function setMove(s, from, to){
+  const moves = { ...schedMoves(s) };
+  const prev = moveTargetOf(s, from);
+  if(to && to !== from) moves[from] = to; else delete moves[from];
+  saveSchedule({ ...s, moves });
+  shiftCompletion(s.id, prev || from, to || from);
+  saveCache();
+}
+
 function whenLabel(s){
   const wd = WD[Number(s.weekday) || 0];
   // 每月的落點文字：「15 號」或「第二個週三」
@@ -1285,7 +1374,10 @@ function eventWhenLabel(e){
 /** 某日期的所有項目（排程 + 單一行程），已排序 */
 function itemsOn(dateStr){
   const out = [];
-  for(const s of state.schedules) if(occursOn(s, dateStr)) out.push({kind:'schedule', row:s});
+  for(const s of state.schedules){
+    const hit = schedShowsOn(s, dateStr);
+    if(hit.on) out.push({kind:'schedule', row:s, origin:hit.origin, moved:hit.moved});
+  }
   for(const e of state.events){
     if(!eventCovers(e, dateStr)) continue;
     const span = eventSpan(e);
@@ -1495,7 +1587,9 @@ const MIGRATIONS = [
   { file:'2026-08-monthly-nth.sql',
     checks:[['schedules','month_mode,week_of_month']] },
   { file:'2026-08-tasks.sql',
-    checks:[['tasks','due_date,subtasks,done,completed_at']] }
+    checks:[['tasks','due_date,subtasks,done,completed_at']] },
+  { file:'2026-08-move.sql',
+    checks:[['schedules','moves']] }
 ];
 async function checkSchema(){
   if(!sb || !session) return;
@@ -1696,7 +1790,7 @@ function cadenceHTML(s, weeks){
   for(let w = 0; w < weeks; w++){
     let ticks = '';
     for(let i = 0; i < 7; i++){
-      const k = w*7 + i, on = occursOn(s, addDays(today, k));
+      const k = w*7 + i, on = schedShowsOn(s, addDays(today, k)).on;
       if(on) n++;
       ticks += `<i class="${on?'on':''}${k===0?' now':''}"></i>`;
     }
@@ -1938,9 +2032,10 @@ function renderDay(){
     const ev = it.kind === 'event';
     const col = catColor(r.category);
     const style = ev ? `--c:${col};--c-soft:${hexRgba(col,.13)};--c-line:${hexRgba(col,.4)}` : '';
-    const kindTag = ev
+    const kindTag = (ev
       ? `<span class="tag ev">${it.span>1?`多日行程 第 ${it.dayIndex}/${it.span} 天`:'單一行程'}</span>`
-      : `<span class="tag">${esc(whenLabel(r))}</span>`;
+      : `<span class="tag">${esc(whenLabel(r))}</span>`)
+      + (it.moved ? `<span class="tag mv">原 ${esc(mdDate(it.origin))} 挪來</span>` : '');
     return `<div class="drow ${ev?'evt':''} ${r.important?'imp':''} ${dn?'done':''}${takePop(doneKey(r.id, ds))}" data-id="${esc(r.id)}" data-k="${it.kind}" style="${style}">
       <button class="ck ${dn?'on':''}" data-act="ck" aria-label="標記完成">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>
@@ -2393,6 +2488,9 @@ function openDetail({kind, row, mode, date}){
     </div>`;
   }
 
+  const mvOrigin = (!isEvt && mode==='calendar') ? (moveOriginOf(row, date) || date) : null;
+  const mvMoved  = mvOrigin !== null && mvOrigin !== date;
+
   if(mode==='calendar'){
     const dn = isDone(row.id, date);
     body += `<button class="dv-check ${dn?'on':''}" id="dv-ck">
@@ -2405,6 +2503,26 @@ function openDetail({kind, row, mode, date}){
       </span>
     </button>
     <div style="height:16px"></div>`;
+  }
+
+  if(mvOrigin){
+    body += `<div class="dv-sec">
+      <h3>這一次的日期</h3>
+      <p class="mv-now">${mvMoved
+        ? `原本是 <span class="from">${esc(fmtDate(mvOrigin))}</span>，這次挪到 <b>${esc(fmtDate(date))}（${wdOf(date)}）</b>。`
+        : `<b>${esc(fmtDate(date))}（${wdOf(date)}）</b>。挪動只影響這一次，重複規則不會變。`}</p>
+      <div class="mv-act">
+        <button class="btn" id="mv-open">${mvMoved?'改挪到別天':'這次挪到其他日期'}</button>
+        ${mvMoved?`<button class="btn" id="mv-reset">移回 ${esc(fmtDate(mvOrigin))}</button>`:''}
+      </div>
+      <div class="mv-pick hide" id="mv-pick">
+        ${datePickerHTML()}
+        <div class="mv-act">
+          <button class="btn" id="mv-cancel">取消</button>
+          <button class="btn pri" id="mv-save">移到這天</button>
+        </div>
+      </div>
+    </div>`;
   }
 
   body += `<div class="dv-sec">
@@ -2427,7 +2545,7 @@ function openDetail({kind, row, mode, date}){
     footer = `<button class="btn dg" data-del>刪除</button><span class="sp"></span>
               <button class="btn pri" data-edit>編輯</button>`;
   }else{
-    body += `<p class="dv-note">重複排程的內容請至「重複排程」頁修改。</p>`;
+    body += `<p class="dv-note">重複規則與內容請至「重複排程」頁修改；上面的挪動只影響這一次。</p>`;
   }
 
   const m = modal({ title: (row.important?STAR+' ':'') + esc(row.title), body, footer });
@@ -2438,6 +2556,54 @@ function openDetail({kind, row, mode, date}){
     m.close();
     renderCal();
   };
+
+  /* 單次挪動：選好日期後只寫進這條排程的 moves 例外，規則本身不動 */
+  const mvOpen = $('#mv-open', m.ov);
+  if(mvOpen){
+    const pick = $('#mv-pick', m.ov), saveB = $('#mv-save', m.ov);
+    let mdp = null;
+    const jump = to => {
+      state.selDate = to;
+      const d = parseYmd(to);
+      state.calY = d.getFullYear(); state.calM = d.getMonth();
+      m.close(); renderCal();
+    };
+    mvOpen.onclick = ()=>{
+      pick.classList.remove('hide');
+      mvOpen.classList.add('hide');
+      if(!mdp) mdp = wireDatePicker(m.ov, {
+        initial: [date], single: true,
+        // 同一條排程一天只會有一筆，本來就會出現的日子不給挪過去
+        blocked: ds => (ds !== mvOrigin && ds !== date && schedShowsOn(row, ds).on)
+          ? '這天本來就有這條排程' : false,
+        onChange: list => {
+          const t = list[0];
+          const same = !t || t === date;          // 沒動就沒得移
+          saveB.disabled = same;
+          saveB.textContent = same ? '點一天來挪動'
+            : t === mvOrigin ? `移回 ${fmtDate(mvOrigin)}`
+            : `移到 ${fmtDate(t)}`;
+        }
+      });
+      pick.scrollIntoView({block:'nearest'});
+    };
+    $('#mv-cancel', m.ov).onclick = ()=>{
+      pick.classList.add('hide'); mvOpen.classList.remove('hide');
+    };
+    saveB.onclick = ()=>{
+      const t = mdp.get()[0];
+      if(!t || t === date) return;
+      setMove(row, mvOrigin, t === mvOrigin ? null : t);
+      jump(t);
+      toast(t === mvOrigin ? `已移回 ${fmtDate(mvOrigin)}` : `這次移到 ${fmtDate(t)}`);
+    };
+    const rs = $('#mv-reset', m.ov);
+    if(rs) rs.onclick = ()=>{
+      setMove(row, mvOrigin, null);
+      jump(mvOrigin);
+      toast(`已移回 ${fmtDate(mvOrigin)}`);
+    };
+  }
   const del = $('[data-del]', m.ov);
   if(del) del.onclick = ()=>{
     const what = kind==='event' ? '單一行程' : '重複排程';
@@ -2573,7 +2739,7 @@ function openScheduleForm(existing){
     weekday:new Date().getDay(), month_day:new Date().getDate(),
     month_mode:'day', week_of_month:1,
     start_date:today, end_date:null, interval_n:2, custom_unit:'week',
-    time_text:'', category:'', important:false, links:[]
+    time_text:'', category:'', important:false, links:[], moves:{}
   };
   // 既有排程沒填起始日時，用建立日期回填，才不會把過去的紀錄藏起來
   const startInit = s.start_date || s.anchor_date
@@ -2696,8 +2862,10 @@ function openScheduleForm(existing){
       time_text: $('#f-time', R).value.trim(),
       category: ($('#f-cat', R).value === '__new__' ? '' : $('#f-cat', R).value),
       important: impValue(R),
-      links: readLinks(R)
+      links: readLinks(R),
+      moves: schedMoves(s)
     };
+    row.moves = pruneMoves(row);
     saveSchedule(row);
     m.close(); render();
     toast(existing ? '已儲存' : '已新增排程');
@@ -2718,7 +2886,7 @@ function datePickerHTML(){
   return `<div class="mdp" id="f-dates"></div><p class="mdp-sum" id="f-dsum"></p>`;
 }
 
-function wireDatePicker(R, { initial, single, onChange }){
+function wireDatePicker(R, { initial, single, onChange, blocked, dot }){
   const sel = new Set((initial || []).filter(Boolean));
   const box = $('#f-dates', R), sum = $('#f-dsum', R);
   const anchor = parseYmd([...sel][0] || todayStr());
@@ -2731,11 +2899,11 @@ function wireDatePicker(R, { initial, single, onChange }){
     sum.classList.toggle('multi', a.length > 1);
     if(!a.length){ sum.innerHTML = '請至少點選一天。'; return; }
     if(a.length === 1){
-      const d = parseYmd(a[0]);
-      sum.innerHTML = `已選 <b>${esc(fmtDate(a[0]))}</b>（週${WD[d.getDay()]}）。再點其他天可以一次建立多筆。`;
+      sum.innerHTML = `已選 <b>${esc(fmtDate(a[0]))}</b>（${wdOf(a[0])}）。`
+        + (single ? '' : '再點其他天可以一次建立多筆。');
       return;
     }
-    const txt = a.map(x=>{ const d = parseYmd(x); return `${d.getMonth()+1}/${d.getDate()}`; }).join('、');
+    const txt = a.map(mdDate).join('、');
     sum.innerHTML = `已選 <b>${a.length} 天</b>：${esc(txt)}<br>會建立 ${a.length} 筆各自獨立的行程。`;
   };
 
@@ -2751,12 +2919,12 @@ function wireDatePicker(R, { initial, single, onChange }){
     for(let i = 0; i < nWeeks * 7; i++){
       const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
       const ds = ymd(d), on = sel.has(ds);
-      // 只標「已經有單一行程」的日子。重複排程幾乎天天都有，標了等於每天都有點，
-      // 反而看不出哪一天真的卡了東西。
-      const busy = state.events.filter(x=>eventCovers(x, ds)).length;
+      const blk = blocked ? blocked(ds) : false;
+      const busy = dot ? dot(ds) : 0;
       cells += `<button type="button" data-d="${ds}" aria-pressed="${on?'true':'false'}"
-        aria-label="${esc(fmtDate(ds))}${busy?`，已有 ${busy} 筆行程`:''}"
-        class="${d.getMonth()!==m?'out':''} ${ds===today?'today':''} ${on?'on':''}"
+        ${blk?'disabled aria-disabled="true"':''}
+        aria-label="${esc(fmtDate(ds))}${blk?`，${esc(String(blk))}`:''}${busy?`，已有 ${busy} 筆行程`:''}"
+        class="${d.getMonth()!==m?'out':''} ${ds===today?'today':''} ${on?'on':''} ${blk?'blk':''}"
         >${d.getDate()}${busy?'<i></i>':''}</button>`;
     }
     box.innerHTML = `<div class="mdp-bar">
@@ -2772,6 +2940,7 @@ function wireDatePicker(R, { initial, single, onChange }){
       draw();
     });
     $$('.mdp-grid button', box).forEach(b=>b.onclick = ()=>{
+      if(b.disabled) return;
       const ds = b.dataset.d;
       if(single){ sel.clear(); sel.add(ds); }
       else if(sel.has(ds)) sel.delete(ds);
@@ -2842,7 +3011,10 @@ function openEventForm(existing, presetDate){
   dp = wireDatePicker(R, {
     initial: [e.date],
     single: !!existing,          // 編輯既有行程時只改這一筆的日期
-    onChange: onDates
+    onChange: onDates,
+    // 只標「已經有單一行程」的日子。重複排程幾乎天天都有，標了等於每天都有點，
+    // 反而看不出哪一天真的卡了東西。
+    dot: ds => state.events.filter(x => x.id !== e.id && eventCovers(x, ds)).length
   });
   $('#f-edate', R).onchange = ()=>showSpan();
 
@@ -3014,6 +3186,7 @@ function normSchedule(s){
     time_text: String(s.time_text||''),
     category: String(s.category||''),
     important: !!s.important,
+    moves: normMoves(s.moves),
     links: normLinks(s.links)
   };
 }

@@ -37,6 +37,7 @@ create table if not exists public.schedules (
   time_text   text default '',
   category    text default '',
   important   boolean not null default false,   -- 重大事件
+  moves       jsonb not null default '{}'::jsonb, -- 單次改期例外 {"原本日期":"改到的日期"}
   links       jsonb not null default '[]'::jsonb,
   created_at  timestamptz not null default now(),
   constraint schedules_range_check
