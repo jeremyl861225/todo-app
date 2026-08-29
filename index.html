@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#F3EDE0" id="mt-theme">
+<meta name="theme-color" content="#F2EFE3" id="mt-theme">
 <meta name="color-scheme" content="light dark">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -37,64 +37,64 @@
   --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
 
   /* ---- 動態：只有一個被刻意設計的瞬間（勾選完成），其餘一律安靜 ---- */
-  --c:#4E6B57;                 /* 類別色的保底值，元素會用 style 覆寫 */
+  --c:#6C7240;                 /* 類別色的保底值，元素會用 style 覆寫 */
   --e-out:cubic-bezier(.2,.8,.25,1);
   --d-1:.14s; --d-2:.22s; --d-3:.36s;
 }
 
-/* ---------- 淺色：暖紙 ---------- */
+/* ---------- 淺色：燕麥紙。色票的橄欖與赭石落在暖砂底上 ---------- */
 :root{
   color-scheme:light;
-  --bg:#F3EDE0;          --bg2:#EAE2D1;
-  --card:#FFFCF6;        --card2:#FAF5E9;
-  --line:#DFD5C0;        --line-soft:#EDE4D4;
-  --ink:#2A261F;         --ink2:#57503F;       --muted:#726957;
-  --tick:#E4DBC7;                              /* 節奏條的空檔 */
+  --bg:#F2EFE3;          --bg2:#E8E3D3;
+  --card:#FDFBF3;        --card2:#F8F4E6;
+  --line:#DBD4BE;        --line-soft:#EBE5D4;
+  --ink:#2B190B;         --ink2:#4A2F1A;       --muted:#786450;
+  --tick:#E3DCC6;                              /* 節奏條的空檔 */
 
-  --accent:#4E6B57;      --accent-ink:#3A5344;
-  --accent-soft:#E2ECE3; --accent-line:#C4D7C8; --on-accent:#FFFCF6;
-  --hot:#A5552F;         --hot-ink:#7A3E24;
-  --hot-soft:#F6E6DB;    --hot-line:#E7CDB9;    --on-hot:#FFFCF6;
-  --danger:#A03B2F;      --danger-soft:#FBEFEC; --danger-line:#E7CDC6;
+  --accent:#6C7240;      --accent-ink:#535831;
+  --accent-soft:#E8EAD5; --accent-line:#CBD0AC; --on-accent:#FDFBF3;
+  --hot:#9A682F;         --hot-ink:#7C5222;
+  --hot-soft:#F6E9D6;    --hot-line:#E7D1AF;    --on-hot:#FFFBF2;
+  --danger:#8A2E26;      --danger-soft:#F8E8E4; --danger-line:#E6C9C2;
 
-  --imp-ring:rgba(165,85,47,.34);
-  --imp-ring-hi:rgba(165,85,47,.5);
-  --bg-blur:rgba(243,237,224,.88);
-  --nav-bg:rgba(255,252,246,.94);
-  --scrim:rgba(48,40,26,.42);
-  --toast-bg:#2F2C1D;    --toast-ink:#F6F1E4;
-  --toast-bad:#7C382C;   --toast-bad-ink:#FFF6F2;
+  --imp-ring:rgba(161,109,49,.34);
+  --imp-ring-hi:rgba(161,109,49,.5);
+  --bg-blur:rgba(242,239,227,.88);
+  --nav-bg:rgba(253,251,243,.94);
+  --scrim:rgba(43,25,11,.44);
+  --toast-bg:#2B190B;    --toast-ink:#F2EFE3;
+  --toast-bad:#481816;   --toast-bad-ink:#FBEDE9;
 
-  --sh-1:0 1px 2px rgba(64,52,30,.06);
-  --sh-2:0 1px 2px rgba(64,52,30,.05), 0 8px 24px rgba(64,52,30,.09);
-  --sh-3:0 24px 64px rgba(40,30,14,.26);
-  --sh-fab:0 6px 20px rgba(48,72,56,.3);
-  --sh-fab-hi:0 10px 26px rgba(48,72,56,.36);
+  --sh-1:0 1px 2px rgba(43,25,11,.07);
+  --sh-2:0 1px 2px rgba(43,25,11,.06), 0 8px 24px rgba(43,25,11,.10);
+  --sh-3:0 24px 64px rgba(43,25,11,.28);
+  --sh-fab:0 6px 20px rgba(76,80,45,.32);
+  --sh-fab-hi:0 10px 26px rgba(76,80,45,.38);
 }
 
-/* ---------- 深色：暖墨。值班半夜開這個 App 不該被白底閃到 ---------- */
+/* ---------- 深色：濃咖啡。底色直接取色票最深的兩階，值班半夜開這個 App 不該被白底閃到 ---------- */
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
     color-scheme:dark;
-    --bg:#15130E;          --bg2:#221F17;
-    --card:#1C1A13;        --card2:#24211A;
-    --line:#3B3629;        --line-soft:#2C2820;
-    --ink:#F0E9D8;         --ink2:#C3BAA4;       --muted:#968D79;
-    --tick:#332F24;
+    --bg:#16100A;          --bg2:#241708;
+    --card:#1E1509;        --card2:#2B190B;
+    --line:#4A2F1A;        --line-soft:#33210F;
+    --ink:#F1E9D6;         --ink2:#C9BEA2;       --muted:#9A8B6E;
+    --tick:#3A2814;
 
-    --accent:#8CB79A;      --accent-ink:#B3D5BC;
-    --accent-soft:#1F2C24; --accent-line:#3A5344; --on-accent:#14231A;
-    --hot:#D18A5E;         --hot-ink:#E8AF87;
-    --hot-soft:#2E2018;    --hot-line:#4A3324;    --on-hot:#1F140D;
-    --danger:#E08573;      --danger-soft:#2E1A16; --danger-line:#4E2C25;
+    --accent:#B8BA92;      --accent-ink:#CBCDA8;
+    --accent-soft:#25261A; --accent-line:#4C4E33; --on-accent:#1E1F10;
+    --hot:#D2954E;         --hot-ink:#E5B478;
+    --hot-soft:#2E2010;    --hot-line:#4C3418;    --on-hot:#21160A;
+    --danger:#E0897A;      --danger-soft:#2E1512; --danger-line:#58231D;
 
-    --imp-ring:rgba(209,138,94,.42);
-    --imp-ring-hi:rgba(209,138,94,.62);
-    --bg-blur:rgba(21,19,14,.88);
-    --nav-bg:rgba(28,26,19,.94);
-    --scrim:rgba(0,0,0,.62);
-    --toast-bg:#EDE6D6;    --toast-ink:#221F17;
-    --toast-bad:#E08573;   --toast-bad-ink:#2A1512;
+    --imp-ring:rgba(210,149,78,.42);
+    --imp-ring-hi:rgba(210,149,78,.62);
+    --bg-blur:rgba(22,16,10,.88);
+    --nav-bg:rgba(30,21,9,.94);
+    --scrim:rgba(0,0,0,.66);
+    --toast-bg:#EDE5D2;    --toast-ink:#241708;
+    --toast-bad:#E0897A;   --toast-bad-ink:#2A100D;
 
     --sh-1:0 1px 2px rgba(0,0,0,.34);
     --sh-2:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.42);
@@ -105,25 +105,25 @@
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
-  --bg:#15130E;          --bg2:#221F17;
-  --card:#1C1A13;        --card2:#24211A;
-  --line:#3B3629;        --line-soft:#2C2820;
-  --ink:#F0E9D8;         --ink2:#C3BAA4;       --muted:#968D79;
-  --tick:#332F24;
+  --bg:#16100A;          --bg2:#241708;
+  --card:#1E1509;        --card2:#2B190B;
+  --line:#4A2F1A;        --line-soft:#33210F;
+  --ink:#F1E9D6;         --ink2:#C9BEA2;       --muted:#9A8B6E;
+  --tick:#3A2814;
 
-  --accent:#8CB79A;      --accent-ink:#B3D5BC;
-  --accent-soft:#1F2C24; --accent-line:#3A5344; --on-accent:#14231A;
-  --hot:#D18A5E;         --hot-ink:#E8AF87;
-  --hot-soft:#2E2018;    --hot-line:#4A3324;    --on-hot:#1F140D;
-  --danger:#E08573;      --danger-soft:#2E1A16; --danger-line:#4E2C25;
+  --accent:#B8BA92;      --accent-ink:#CBCDA8;
+  --accent-soft:#25261A; --accent-line:#4C4E33; --on-accent:#1E1F10;
+  --hot:#D2954E;         --hot-ink:#E5B478;
+  --hot-soft:#2E2010;    --hot-line:#4C3418;    --on-hot:#21160A;
+  --danger:#E0897A;      --danger-soft:#2E1512; --danger-line:#58231D;
 
-  --imp-ring:rgba(209,138,94,.42);
-  --imp-ring-hi:rgba(209,138,94,.62);
-  --bg-blur:rgba(21,19,14,.88);
-  --nav-bg:rgba(28,26,19,.94);
-  --scrim:rgba(0,0,0,.62);
-  --toast-bg:#EDE6D6;    --toast-ink:#221F17;
-  --toast-bad:#E08573;   --toast-bad-ink:#2A1512;
+  --imp-ring:rgba(210,149,78,.42);
+  --imp-ring-hi:rgba(210,149,78,.62);
+  --bg-blur:rgba(22,16,10,.88);
+  --nav-bg:rgba(30,21,9,.94);
+  --scrim:rgba(0,0,0,.66);
+  --toast-bg:#EDE5D2;    --toast-ink:#241708;
+  --toast-bad:#E0897A;   --toast-bad-ink:#2A100D;
 
   --sh-1:0 1px 2px rgba(0,0,0,.34);
   --sh-2:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.42);
@@ -630,9 +630,9 @@ input[type=date]::-webkit-calendar-picker-indicator{opacity:.5;cursor:pointer}
 input[type=date]::-webkit-calendar-picker-indicator:hover{opacity:.85}
 select.inp{appearance:none;background-image:var(--sel-arrow);
   background-repeat:no-repeat;background-position:right 12px center;background-size:16px;padding-right:36px}
-:root{--sel-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23726957' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")}
-:root[data-theme="dark"]{--sel-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23968D79' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--sel-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23968D79' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")}}
+:root{--sel-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23786450' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")}
+:root[data-theme="dark"]{--sel-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239A8B6E' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--sel-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239A8B6E' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")}}
 /* 表單裡的多選日期：一次點好幾天就建立好幾筆各自獨立的行程。
    （「這三天都要跟刀」不是一個橫跨三天的活動，用結束日期表達會是錯的語意。） */
 .mdp{border:1px solid var(--line);border-radius:var(--r-sm);background:var(--card2);overflow:hidden}
@@ -1053,7 +1053,9 @@ const FREQ_LABEL = Object.fromEntries(FREQS.map(f=>[f.k,f.label]));
 const UNITS = [{k:'day',label:'天'},{k:'week',label:'週'},{k:'month',label:'個月'}];
 const UNIT_LABEL = Object.fromEntries(UNITS.map(u=>[u.k,u.label]));
 const WD = ['日','一','二','三','四','五','六'];
-const PALETTE = ['#4E6B57','#B0603A','#6A7FA0','#8A6A9C','#A8874A','#3F7F79','#9A5A64','#6E7B4A'];
+/* 類別色：色相彼此拉開至少 30 度。liftForDark() 只保留色相，亮度與彩度都會被壓成同一階，
+   靠深淺分辨的兩色在深色主題會併成同一個顏色，所以這裡只能用色相區分。 */
+const PALETTE = ['#6C7240','#9A682F','#8E332E','#4F6484','#4B7343','#6F5590','#2F6C63','#8B4462'];
 const DEFAULT_CATS = ['工作','私人'];
 
 /* ---------- 工具 ---------- */
@@ -1136,7 +1138,7 @@ function liftForDark(hex){
 const isDarkMode = () => document.documentElement.classList.contains('is-dark');
 function catColor(name){
   let base;
-  if(!name) base = '#A79C88';
+  if(!name) base = '#8F8368';
   else {
     const c = state.categories.find(x=>x.name===name);
     if(c && c.color) base = c.color;
@@ -1151,7 +1153,7 @@ function catColor(name){
    三段：跟隨系統／淺色／深色。深色不是把顏色反過來，是另一組暖墨色票；
    類別色也會跟著換算，所以切換後要重畫一次。 */
 const THEME_KEY = 'todo.theme';
-const THEME_BG  = { light:'#F3EDE0', dark:'#15130E' };
+const THEME_BG  = { light:'#F2EFE3', dark:'#16100A' };
 const prefersDark = () => window.matchMedia('(prefers-color-scheme:dark)').matches;
 function themeMode(){
   try{ const v = localStorage.getItem(THEME_KEY); if(v==='light'||v==='dark') return v; }catch(e){}
