@@ -37,7 +37,7 @@
   --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
 
   /* ---- 動態：只有一個被刻意設計的瞬間（勾選完成），其餘一律安靜 ---- */
-  --c:#6C7240;                 /* 類別色的保底值，元素會用 style 覆寫 */
+  --c:#636845;                 /* 類別色的保底值，元素會用 style 覆寫 */
   --e-out:cubic-bezier(.2,.8,.25,1);
   --d-1:.14s; --d-2:.22s; --d-3:.36s;
 }
@@ -51,8 +51,8 @@
   --ink:#2B190B;         --ink2:#4A2F1A;       --muted:#786450;
   --tick:#E3DCC6;                              /* 節奏條的空檔 */
 
-  --accent:#6C7240;      --accent-ink:#535831;
-  --accent-soft:#E8EAD5; --accent-line:#CBD0AC; --on-accent:#FDFBF3;
+  --accent:#4A2F1A;      --accent-ink:#2F1D0C;
+  --accent-soft:#EFE7DB; --accent-line:#D7C6B2; --on-accent:#FDFBF3;
   --hot:#9A682F;         --hot-ink:#7C5222;
   --hot-soft:#F6E9D6;    --hot-line:#E7D1AF;    --on-hot:#FFFBF2;
   --danger:#8A2E26;      --danger-soft:#F8E8E4; --danger-line:#E6C9C2;
@@ -68,8 +68,8 @@
   --sh-1:0 1px 2px rgba(43,25,11,.07);
   --sh-2:0 1px 2px rgba(43,25,11,.06), 0 8px 24px rgba(43,25,11,.10);
   --sh-3:0 24px 64px rgba(43,25,11,.28);
-  --sh-fab:0 6px 20px rgba(76,80,45,.32);
-  --sh-fab-hi:0 10px 26px rgba(76,80,45,.38);
+  --sh-fab:0 6px 20px rgba(74,47,26,.32);
+  --sh-fab-hi:0 10px 26px rgba(74,47,26,.38);
 }
 
 /* ---------- 深色：濃咖啡。底色直接取色票最深的兩階，值班半夜開這個 App 不該被白底閃到 ---------- */
@@ -175,12 +175,14 @@ header.top{
   padding-top:env(safe-area-inset-top);
 }
 .top-in{display:flex;align-items:center;gap:var(--s-4);min-height:58px}
-.brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.03em;font-size:var(--t-xl);white-space:nowrap}
-/* 與主畫面 icon 同一個圖案，已去背只留線條 */
-.appicon{display:block;object-fit:contain;width:auto}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.03em;font-size:var(--t-xl);white-space:nowrap;color:var(--accent)}
+/* 與主畫面 icon 同一個圖案，已去背只留線條。
+   PNG 本身是黑的，所以不當圖片放，改用 mask 讓它吃 --accent —— 深淺兩套主題
+   都直接跟著主色走，不必再用 invert 去猜一個顏色。 */
+.appicon{display:block;width:auto;aspect-ratio:314/270;background:var(--accent);
+  -webkit-mask:url(mark.png) no-repeat center/contain;
+          mask:url(mark.png) no-repeat center/contain}
 .brand .mk{height:20px;flex:none}
-:root[data-theme="dark"] .appicon{filter:invert(1) brightness(1.06)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .appicon{filter:invert(1) brightness(1.06)}}
 .top-sp{flex:1}
 .pill{
   display:inline-flex;align-items:center;gap:var(--s-2);height:29px;padding:0 11px;
@@ -415,7 +417,8 @@ span.star svg{width:100%;height:100%;display:block}
 @media(min-width:940px){.cal-layout{grid-template-columns:minmax(0,1fr) 344px;align-items:start}}
 
 .calbar{display:flex;align-items:center;gap:var(--s-3);margin:0 0 var(--s-4)}
-.calbar .mo{font-size:var(--t-xl);font-weight:700;letter-spacing:.03em;min-width:126px;font-variant-numeric:tabular-nums}
+.calbar .mo{font-size:var(--t-xl);font-weight:700;letter-spacing:.03em;min-width:134px;
+  text-align:center;font-variant-numeric:tabular-nums}
 .calbar .sp{flex:1}
 .tbtn{border:1px solid var(--line);background:var(--card);border-radius:999px;
   height:32px;padding:0 14px;font-size:var(--t-sm);color:var(--ink2);box-shadow:var(--sh-1);
@@ -466,6 +469,9 @@ span.star svg{width:100%;height:100%;display:block}
 .cell.sel{background:var(--accent-soft)}
 /* 選取格的底色比一般格深一階，日期用 ink2 會剛好掉到 4.5 以下 */
 .cell.sel .dn{color:var(--ink)}
+/* 今天同時被選中：.cell.sel 在後面會蓋掉上面的 .cell.today，日期字會變深色
+   掉進赭黃底裡，所以這裡補一條更明確的規則把白字要回來 */
+.cell.today.sel .dn{color:var(--on-hot)}
 .cell.sel::after{content:"";position:absolute;inset:0;border:2px solid var(--accent);
   border-radius:2px;pointer-events:none}
 .dots{display:flex;flex-wrap:wrap;gap:3px;padding:0 1px}
@@ -856,7 +862,7 @@ select.inp{appearance:none;background-image:var(--sel-arrow);
 <section id="scr-auth" class="authwrap hide">
   <div class="authbox">
     <div class="lg">
-      <img class="appicon lg-icon" src="mark.png" alt="" width="314" height="270">
+      <span class="appicon lg-icon" aria-hidden="true"></span>
       <b>待辦事項</b>
       <span>重複排程與月曆，跨裝置同步</span>
     </div>
@@ -889,7 +895,7 @@ select.inp{appearance:none;background-image:var(--sel-arrow);
 <section id="scr-reset" class="authwrap hide">
   <div class="authbox">
     <div class="lg">
-      <img class="appicon lg-icon" src="mark.png" alt="" width="314" height="270">
+      <span class="appicon lg-icon" aria-hidden="true"></span>
       <b>設定新密碼</b>
       <span id="rs-who">請輸入要使用的新密碼</span>
     </div>
@@ -914,7 +920,7 @@ select.inp{appearance:none;background-image:var(--sel-arrow);
   <header class="top">
     <div class="wrap top-in">
       <div class="brand">
-        <img class="appicon mk" src="mark.png" alt="" width="314" height="270">
+        <span class="appicon mk" aria-hidden="true"></span>
         <span>待辦事項</span>
       </div>
       <div class="top-sp"></div>
@@ -1053,9 +1059,27 @@ const FREQ_LABEL = Object.fromEntries(FREQS.map(f=>[f.k,f.label]));
 const UNITS = [{k:'day',label:'天'},{k:'week',label:'週'},{k:'month',label:'個月'}];
 const UNIT_LABEL = Object.fromEntries(UNITS.map(u=>[u.k,u.label]));
 const WD = ['日','一','二','三','四','五','六'];
-/* 類別色：色相彼此拉開至少 30 度。liftForDark() 只保留色相，亮度與彩度都會被壓成同一階，
-   靠深淺分辨的兩色在深色主題會併成同一個顏色，所以這裡只能用色相區分。 */
-const PALETTE = ['#6C7240','#9A682F','#8E332E','#4F6484','#4B7343','#6F5590','#2F6C63','#8B4462'];
+/* 類別色一律取自色票的四個色相家族（橄欖／赭黃／棕／酒紅），每族各一深一淺。
+   色票只有四個色相，所以深淺必須也能分辨——liftForDark() 因此改成保留亮度差。 */
+const PALETTE = ['#636845','#B78534','#B06F4F','#BF4A50','#3B3D1F','#583B19','#3F281C','#481417'];
+/* 舊色票留在資料庫裡的類別色，照 index 換成現在這組。類別色沒有自訂介面、
+   一律由 PALETTE 指派，所以只要對得上舊值就能安全換掉。 */
+const LEGACY_PALETTES = [
+  ['#4E6B57','#B0603A','#6A7FA0','#8A6A9C','#A8874A','#3F7F79','#9A5A64','#6E7B4A'],
+  ['#6C7240','#9A682F','#8E332E','#4F6484','#4B7343','#6F5590','#2F6C63','#8B4462']
+];
+function migrateCatColors(){
+  const map = new Map();
+  for(const old of LEGACY_PALETTES)
+    old.forEach((c,i)=> map.set(c.toUpperCase(), PALETTE[i]));
+  let n = 0;
+  for(const c of state.categories){
+    const to = map.get(String(c.color||'').toUpperCase());
+    if(to && to !== c.color){ c.color = to; n++; enqueue({type:'upsert', table:'categories', row:c}); }
+  }
+  if(n) saveCache();
+  return n;
+}
 const DEFAULT_CATS = ['工作','私人'];
 
 /* ---------- 工具 ---------- */
@@ -1084,7 +1108,7 @@ const SVG = (inner, extra='') =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${inner}</svg>`;
 const IC = {
-  star:  '<path d="M12 2.9l2.83 5.73 6.32.92-4.575 4.46 1.08 6.29L12 17.33l-5.655 2.97 1.08-6.29L2.85 9.55l6.32-.92z" fill="currentColor" stroke-width="1.5"/>',
+  star:  '<path d="M12 2q.9 9.1 10 10-9.1.9-10 10-.9-9.1-10-10 9.1-.9 10-10z" fill="currentColor" stroke-width="1"/>',
   check: '<path d="M4 12.5l5 5L20 6.5" stroke-width="3.4"/>',
   next:  '<path d="M9 5l7 7-7 7" stroke-width="2.8"/>',
   link:  '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
@@ -1122,8 +1146,10 @@ function liftForDark(hex){
   let l = (mx+mn)/2;
   let sa = d ? d / (1 - Math.abs(2*l - 1)) : 0;
   if(l >= .62) return hex;                       // 本來就夠亮就不動
-  l  = .68;
-  sa = Math.min(sa, .5);
+  // 亮度壓成同一階的話，只差深淺的兩色在深色主題會變成同一個顏色，
+  // 所以改成把 [0,.62] 映射到 [.52,.80]：提亮，但深淺順序與間距都保留。
+  l  = .52 + (l / .62) * .28;
+  sa = Math.min(sa, .62);
   const q = l < .5 ? l*(1+sa) : l + sa - l*sa, pp = 2*l - q;
   const ch = t => {
     t = (t+1)%1;
@@ -1637,6 +1663,7 @@ async function pullAll(){
     // tasks 是後來才加的資料表：還沒跑 migration 的帳號讀不到，
     // 這時保留本機既有的內容就好，不要讓整包同步失敗（頂端會有紅色提示列）
     if(!e.error) state.tasks = e.data || [];
+    migrateCatColors();
     rebuildDoneIndex();
     state.loaded = true;
     saveCache();
@@ -3585,6 +3612,7 @@ async function startApp(){
   show('#scr-app');
   loadQueue();
   const hadCache = loadCache();
+  if(hadCache) migrateCatColors();
 
   const now = new Date();
   state.calY = now.getFullYear();
