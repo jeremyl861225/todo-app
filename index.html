@@ -309,8 +309,6 @@ span.star svg{width:100%;height:100%;display:block}
 .item.imp:hover{box-shadow:var(--sh-2), inset 0 0 0 1.5px var(--imp-ring-hi)}
 .tag.imp{background:var(--hot-soft);color:var(--hot-ink);font-weight:600}
 .cchip .star{margin-right:2px;width:9px;height:9px}
-.dots i.imp{box-shadow:0 0 0 1.5px var(--hot)}
-.dots i.imp.done{box-shadow:0 0 0 1.5px var(--hot), inset 0 0 0 1px currentColor}
 .drow.imp{border-color:var(--imp-ring)}
 .dt .star{margin-right:4px}
 /* 表單裡的開關 */
@@ -478,6 +476,14 @@ span.star svg{width:100%;height:100%;display:block}
 .dots i{width:6px;height:6px;border-radius:50%;display:block}
 .dots i.done{box-shadow:inset 0 0 0 1px currentColor;background:transparent !important;opacity:.45}
 .dots i.evt{border-radius:1.5px;transform:rotate(45deg)}   /* 單一行程用菱形 */
+/* 重大事件：手機格子裡直接換成四芒星，與清單、桌機晶片上的記號同一個形狀。
+   用 mask 換形狀，類別色照樣由 background 帶進來；勾完成的改用半透明實心，
+   因為鏤空的星星在 6px 上只會糊成一團。 */
+:root{--star4:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2q.9 9.1 10 10-9.1.9-10 10-.9-9.1-10-10 9.1-.9 10-10z' fill='%23000'/%3E%3C/svg%3E")}
+.dots i.imp{width:10px;height:10px;border-radius:0;transform:none;box-shadow:none;
+  -webkit-mask:var(--star4) no-repeat center/contain;
+          mask:var(--star4) no-repeat center/contain}
+.dots i.imp.done{background:currentColor !important;opacity:.45;box-shadow:none}
 .cchips{display:none;flex-direction:column;gap:2px;min-width:0}
 .cchip{font-size:var(--t-2xs);line-height:1.4;padding:2px 6px;border-radius:5px;background:var(--bg2);
   color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
@@ -512,6 +518,9 @@ span.star svg{width:100%;height:100%;display:block}
 .legend span{display:inline-flex;align-items:center;gap:var(--s-2)}
 .legend .lg-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
 .legend .lg-dot.evt{border-radius:1.5px;transform:rotate(45deg)}
+.legend .lg-dot.imp{width:10px;height:10px;border-radius:0;transform:none;
+  -webkit-mask:var(--star4) no-repeat center/contain;
+          mask:var(--star4) no-repeat center/contain}
 .legend .lg-bar{width:22px;height:6px;border-radius:999px;background:var(--muted);flex:none;opacity:.7}
 .legend .lg-note{margin-left:auto}
 
@@ -987,6 +996,7 @@ select.inp{appearance:none;background-image:var(--sel-arrow);
             <span><i class="lg-dot"></i>重複排程</span>
             <span><i class="lg-dot evt"></i>單一行程</span>
             <span><i class="lg-bar"></i>多日行程</span>
+            <span><i class="lg-dot imp"></i>重大事件</span>
             <span class="lg-note">顏色代表類別</span>
           </div>
         </div>
