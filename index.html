@@ -472,22 +472,35 @@ span.star svg{width:100%;height:100%;display:block}
 .cell.today.sel .dn{color:var(--on-hot)}
 .cell.sel::after{content:"";position:absolute;inset:0;border:2px solid var(--accent);
   border-radius:2px;pointer-events:none}
-.dots{display:flex;align-items:center;flex-wrap:wrap;gap:3px;padding:0 1px}
-.dots i{width:7px;height:7px;border-radius:50%;display:block}
+/* 一格的寬度是固定的（360px 手機量到只有 36.4px），所以標點大小不能寫死——
+   寫死就會排不下而換行，而換行的那一列跟上一列對不齊，看起來就是「沒對齊」。
+   改成由這一格「有幾個標點、各是什麼形狀」反推大小：--n 是個數，--u 是把
+   菱形算 1.2 個、四芒星算 1.45 個單位後的總和（它們比圓點寬），JS 逐格寫進來。
+   排得下就用 --cap 的尺寸，排不下就一起縮小，永遠只有一列。 */
+.dots{
+  /* 一格的可用寬度：月曆是七等分，實測 320~640px 之間 100vw/7-15.03px 與真實值
+     只差 0.03px，這裡取 15.5px 留一點餘裕。寫成 vw 而不是斷點，寬度才會連續跟著跑。 */
+  --cap:7px; --avail:calc(100vw / 7 - 15.5px); --n:1; --u:1;
+  /* 間距取標點大小的 0.35 倍而不是固定 px：標點縮小時間距跟著縮，最擠的格子才排得下。
+     寫成比例還有一個好處——gap 由 --m 推出來，--m 就不必再回頭參照 gap，不會循環參照。
+     解 m×(單位數 + 0.35×(個數-1)) = 可用寬 即得下式。 */
+  --m:clamp(2.4px, calc(var(--avail) / (var(--u) + .35 * (var(--n) - 1))), var(--cap));
+  display:flex;align-items:center;flex-wrap:wrap;gap:calc(var(--m) * .35);padding:0 1px;
+}
+.dots i{width:var(--m);height:var(--m);border-radius:50%;display:block}
 .dots i.done{box-shadow:inset 0 0 0 1px currentColor;background:transparent !important;opacity:.45}
-/* 三個標點要「看起來一樣大」，靠的是墨跡面積相等，不是外框相等——外框相等時
-   菱形只有圓點的 64%、四芒星更少，就會顯得比較小。所以各自反推：
-     圓點   ⌀7px         面積 38.5px²
-     菱形   對角線 8.77px = √(2×38.5)
-     四芒星 11px          a=2 的尖星只佔外框 27.8%，等面積要 11.8px，收到 11px
-   菱形另外要處理旋轉：transform 不影響版面盒子，所以邊長取對角線/√2，
-   再補 margin 把版面盒子墊回對角線的寬度，否則 flex 的 gap 照未旋轉的盒子算。 */
-.dots i.evt{width:6.2px;height:6.2px;margin:0 1.285px;border-radius:1.55px;transform:rotate(45deg)}
+/* 外框一樣大時菱形的墨跡只有圓點的 64%、四芒星更少，看起來就比較小，所以兩者
+   都要比圓點寬：菱形 1.2 倍、四芒星 1.45 倍（純粹等面積要 1.25 / 1.68 倍，那樣
+   一格放不下幾個，取折衷）。菱形另外要處理旋轉：transform 不影響版面盒子，
+   邊長取 對角線/√2，再補 margin 把版面盒子墊回對角線的寬度，否則 flex 的 gap
+   會照未旋轉的盒子算，間距就會少一截。 */
+.dots i.evt{width:calc(var(--m)*.8485);height:calc(var(--m)*.8485);margin:0 calc(var(--m)*.1757);
+  border-radius:calc(var(--m)*.2121);transform:rotate(45deg)}
 /* 重大事件：手機格子裡直接換成四芒星，與清單、桌機晶片上的記號同一個形狀。
    用 mask 換形狀，類別色照樣由 background 帶進來；勾完成的改用半透明實心，
    因為鏤空的星星在 6px 上只會糊成一團。 */
 :root{--star4:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 0Q14 10 24 12 14 14 12 24 10 14 0 12 10 10 12 0Z' fill='%23000'/%3E%3C/svg%3E")}
-.dots i.imp{width:11px;height:11px;margin:0;border-radius:0;transform:none;box-shadow:none;
+.dots i.imp{width:calc(var(--m)*1.45);height:calc(var(--m)*1.45);margin:0;border-radius:0;transform:none;box-shadow:none;
   -webkit-mask:var(--star4) no-repeat center/contain;
           mask:var(--star4) no-repeat center/contain}
 .dots i.imp.done{background:currentColor !important;opacity:.45;box-shadow:none}
@@ -524,8 +537,8 @@ span.star svg{width:100%;height:100%;display:block}
   background:var(--card2);border-top:1px solid var(--line-soft);font-size:var(--t-2xs);color:var(--muted)}
 .legend span{display:inline-flex;align-items:center;gap:var(--s-2)}
 .legend .lg-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
-.legend .lg-dot.evt{width:7.09px;height:7.09px;margin:0 1.47px;border-radius:1.77px;transform:rotate(45deg)}
-.legend .lg-dot.imp{width:12.6px;height:12.6px;border-radius:0;transform:none;
+.legend .lg-dot.evt{width:6.79px;height:6.79px;margin:0 1.41px;border-radius:1.70px;transform:rotate(45deg)}
+.legend .lg-dot.imp{width:11.6px;height:11.6px;border-radius:0;transform:none;
   -webkit-mask:var(--star4) no-repeat center/contain;
           mask:var(--star4) no-repeat center/contain}
 .legend .lg-bar{width:22px;height:6px;border-radius:999px;background:var(--muted);flex:none;opacity:.7}
@@ -2000,13 +2013,17 @@ function renderCal(){
       // 格子只放得下前幾筆，未完成的排前面，才不會被已完成的擠掉
       const shown = items.slice().sort((a,b)=>
         (isDone(a.row.id, ds) ? 1 : 0) - (isDone(b.row.id, ds) ? 1 : 0));
-      const dots = shown.slice(0,8).map(it=>{
+    const marks = shown.slice(0,8);
+    const dots = marks.map(it=>{
       const done = isDone(it.row.id, ds);
       const col = catColor(it.row.category);
       const ev = it.kind === 'event' ? ' evt' : '';
       const im = it.row.important ? ' imp' : '';
       return `<i class="${done?'done':''}${ev}${im}" style="${done?`color:${col}`:`background:${col}`}"></i>`;
     }).join('');
+    // 四芒星比圓點寬 1.45 倍、菱形 1.2 倍，所以算的是「單位數」而不是個數，
+    // 否則同樣三個標點，三顆星星的那一格會排不下。
+    const dotU = Math.max(1, marks.reduce((u,it)=> u + (it.row.important ? 1.45 : it.kind === 'event' ? 1.2 : 1), 0));
     const chips = shown.slice(0,LIM).map(it=>{
       const done = isDone(it.row.id, ds);
       const col = catColor(it.row.category);
@@ -2023,7 +2040,7 @@ function renderCal(){
       const more = items.length>LIM ? `<span class="cmore">+${items.length-LIM}</span>` : '';
       cells.push(`<button class="cell ${out?'out':''} ${ds===today?'today':''} ${ds===state.selDate?'sel':''}" data-d="${ds}">
         <span class="dn">${d.getDate()}</span>
-        <span class="dots">${dots}</span>
+        <span class="dots" style="--n:${marks.length};--u:${dotU.toFixed(3)}">${dots}</span>
         <span class="cchips">${chips}${more}</span>
         <span class="lanes" style="height:calc(var(--lane-h) * ${laneCount})"></span>
       </button>`);
