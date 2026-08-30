@@ -9,7 +9,7 @@
  *   - precache 逐一 add，單一檔案缺漏不會讓整個安裝失敗
  */
 const PREFIX = 'todo-app-';
-const CACHE  = PREFIX + 'v5';
+const CACHE  = PREFIX + 'v6';
 
 const PRECACHE = [
   './',
