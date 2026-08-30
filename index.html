@@ -676,17 +676,22 @@ select.inp{appearance:none;background-image:var(--sel-arrow);
 .mdp-dow span{text-align:center;font-size:var(--t-2xs);color:var(--muted);font-weight:600;letter-spacing:.05em}
 .mdp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;padding:4px 6px 8px}
 .mdp-grid button{height:34px;border-radius:var(--r-xs);font-size:var(--t-md);font-weight:600;color:var(--ink);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  position:relative;display:flex;align-items:center;justify-content:center;padding-bottom:5px;
   font-variant-numeric:tabular-nums;transition:background .14s,color .14s}
 .mdp-grid button:hover{background:var(--bg2)}
 .mdp-grid button.out{color:var(--muted);font-weight:400}
 .mdp-grid button.today{box-shadow:inset 0 0 0 1.5px var(--hot)}
 .mdp-grid button.on,.mdp-grid button.on:hover{background:var(--accent);color:var(--on-accent)}
-/* 那天已經有東西了，排的時候看得到 */
-.mdp-grid button i{width:4px;height:4px;border-radius:50%;background:var(--muted);display:block}
+/* 那天已經有東西了，排的時候看得到。用絕對定位墊在數字底下——當初讓它參與
+   flex 排版，有點的日子數字會被往上推 3px，跟沒點的日子對不齊。
+   按鈕統一留 padding-bottom 給這顆點，所以每一格的數字都在同一個高度。 */
+.mdp-grid button i{position:absolute;left:50%;bottom:4px;transform:translateX(-50%);
+  width:4px;height:4px;border-radius:50%;background:var(--muted);display:block}
 .mdp-grid button.on i{background:var(--on-accent);opacity:.75}
 .mdp-grid button.blk{color:var(--muted);text-decoration:line-through;cursor:default}
 .mdp-grid button.blk:hover{background:transparent}
+.mdp-key{display:flex;align-items:center;gap:6px;padding:0 8px 8px;font-size:var(--t-2xs);color:var(--muted)}
+.mdp-key i{width:4px;height:4px;border-radius:50%;background:var(--muted);flex:none}
 .mdp-sum{font-size:var(--t-xs);color:var(--muted);margin:var(--s-2) 0 0;line-height:1.65}
 .mdp-sum b{color:var(--ink2);font-weight:700}
 .mdp-sum.multi b{color:var(--accent-ink)}
@@ -2989,7 +2994,8 @@ function wireDatePicker(R, { initial, single, onChange, blocked, dot }){
         <button type="button" class="iconbtn" data-mp="1" aria-label="下個月">${MP_NEXT}</button>
       </div>
       <div class="mdp-dow">${WD.map(w=>`<span>${w}</span>`).join('')}</div>
-      <div class="mdp-grid">${cells}</div>`;
+      <div class="mdp-grid">${cells}</div>
+      ${dot ? `<div class="mdp-key"><i></i>這天已經有其他單一行程</div>` : ''}`;
 
     $$('[data-mp]', box).forEach(b=>b.onclick = ()=>{
       cur = new Date(cur.getFullYear(), cur.getMonth() + Number(b.dataset.mp), 1);
