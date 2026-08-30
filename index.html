@@ -475,15 +475,19 @@ span.star svg{width:100%;height:100%;display:block}
 .dots{display:flex;align-items:center;flex-wrap:wrap;gap:3px;padding:0 1px}
 .dots i{width:7px;height:7px;border-radius:50%;display:block}
 .dots i.done{box-shadow:inset 0 0 0 1px currentColor;background:transparent !important;opacity:.45}
-/* 單一行程用菱形。轉 45 度後對角線是邊長的 √2 倍，版面盒子卻沒跟著變，
-   會左右各溢出把間距吃掉。邊長取 6/√2 讓轉完的實際佔寬跟圓點、四芒星一樣是 6px，
-   再補上 margin 把版面盒子墊回 6px——否則 flex 的 gap 是照未旋轉的盒子算，間距還是會少。 */
-.dots i.evt{width:4.95px;height:4.95px;margin:0 1.03px;border-radius:1.24px;transform:rotate(45deg)}
+/* 三個標點要「看起來一樣大」，靠的是墨跡面積相等，不是外框相等——外框相等時
+   菱形只有圓點的 64%、四芒星更少，就會顯得比較小。所以各自反推：
+     圓點   ⌀7px         面積 38.5px²
+     菱形   對角線 8.77px = √(2×38.5)
+     四芒星 11px          a=2 的尖星只佔外框 27.8%，等面積要 11.8px，收到 11px
+   菱形另外要處理旋轉：transform 不影響版面盒子，所以邊長取對角線/√2，
+   再補 margin 把版面盒子墊回對角線的寬度，否則 flex 的 gap 照未旋轉的盒子算。 */
+.dots i.evt{width:6.2px;height:6.2px;margin:0 1.285px;border-radius:1.55px;transform:rotate(45deg)}
 /* 重大事件：手機格子裡直接換成四芒星，與清單、桌機晶片上的記號同一個形狀。
    用 mask 換形狀，類別色照樣由 background 帶進來；勾完成的改用半透明實心，
    因為鏤空的星星在 6px 上只會糊成一團。 */
-:root{--star4:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1.5Q15.6 8.4 22.5 12 15.6 15.6 12 22.5 8.4 15.6 1.5 12 8.4 8.4 12 1.5Z' fill='%23000'/%3E%3C/svg%3E")}
-.dots i.imp{width:7px;height:7px;margin:0;border-radius:0;transform:none;box-shadow:none;
+:root{--star4:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 0Q14 10 24 12 14 14 12 24 10 14 0 12 10 10 12 0Z' fill='%23000'/%3E%3C/svg%3E")}
+.dots i.imp{width:11px;height:11px;margin:0;border-radius:0;transform:none;box-shadow:none;
   -webkit-mask:var(--star4) no-repeat center/contain;
           mask:var(--star4) no-repeat center/contain}
 .dots i.imp.done{background:currentColor !important;opacity:.45;box-shadow:none}
@@ -520,8 +524,8 @@ span.star svg{width:100%;height:100%;display:block}
   background:var(--card2);border-top:1px solid var(--line-soft);font-size:var(--t-2xs);color:var(--muted)}
 .legend span{display:inline-flex;align-items:center;gap:var(--s-2)}
 .legend .lg-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
-.legend .lg-dot.evt{width:5.66px;height:5.66px;margin:0 1.17px;border-radius:1.06px;transform:rotate(45deg)}
-.legend .lg-dot.imp{width:8px;height:8px;border-radius:0;transform:none;
+.legend .lg-dot.evt{width:7.09px;height:7.09px;margin:0 1.47px;border-radius:1.77px;transform:rotate(45deg)}
+.legend .lg-dot.imp{width:12.6px;height:12.6px;border-radius:0;transform:none;
   -webkit-mask:var(--star4) no-repeat center/contain;
           mask:var(--star4) no-repeat center/contain}
 .legend .lg-bar{width:22px;height:6px;border-radius:999px;background:var(--muted);flex:none;opacity:.7}
