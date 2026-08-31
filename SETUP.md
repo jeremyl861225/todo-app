@@ -29,10 +29,13 @@ App 啟動時會偵測欄位，缺哪一份就在頂端指名顯示）：
 | [`2026-08-monthly-nth.sql`](migrations/2026-08-monthly-nth.sql) | 每月「第幾個星期幾」 | ✅ 已執行 |
 | [`2026-08-tasks.sql`](migrations/2026-08-tasks.sql) | 近期任務（`tasks` 資料表、子任務、完成日期） | ✅ 已執行 2026-08-23 |
 | [`2026-08-move.sql`](migrations/2026-08-move.sql) | 單次挪動排程日期 | ✅ 已執行 |
-| [`2026-08-subitems.sql`](migrations/2026-08-subitems.sql) | 重複排程與單一行程的子事項（`sub_done` 資料表，逐日勾選） | ⏳ 待執行 |
+| [`2026-08-subitems.sql`](migrations/2026-08-subitems.sql) | 重複排程與單一行程的子事項（`sub_done` 資料表，逐日勾選） | ✅ 已執行 2026-08-31 |
 
 `tasks` 建好後已用真實 RLS 條件驗過（交易內測試、已 rollback 不留資料）：
 本人可新增／讀取／更新，另一個帳號讀 0 筆、改 0 筆、刪 0 筆，未登入讀 0 筆。
+
+`sub_done` 同樣驗過（同一套方法）：本人可新增並讀到 1 筆，另一個帳號讀 0 筆、
+改 0 筆、刪 0 筆，未登入讀 0 筆；測試資料已隨交易 rollback，資料表為空。
 
 > ⚠️ Supabase 的 **Confirm email 仍是開啟的**，所以新註冊的帳號要去信箱點確認信才能登入。
 > 想省掉這一步，到 Supabase → Authentication → Sign In / Providers → Email →
