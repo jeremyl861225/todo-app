@@ -1536,7 +1536,7 @@ function cmpDone(a, b){
 let sb = null;
 let session = null;
 const state = {
-  schedules:[], events:[], completions:[], categories:[], tasks:[],
+  schedules:[], events:[], completions:[], categories:[], tasks:[], subDone:[],
   doneIndex:new Map(),
   page:'list', calY:0, calM:0, selDate: todayStr(),
   filter:null, impOnly:false,
@@ -1557,7 +1557,7 @@ function saveCache(){
       t: Date.now(),
       schedules: state.schedules, events: state.events,
       completions: state.completions, categories: state.categories,
-      tasks: state.tasks
+      tasks: state.tasks, subDone: state.subDone
     }));
   }catch(e){ /* quota */ }
 }
@@ -1571,7 +1571,8 @@ function loadCache(){
     state.completions= d.completions|| [];
     state.categories = d.categories || [];
     state.tasks      = d.tasks      || [];
-    rebuildDoneIndex();
+    state.subDone    = d.subDone    || [];
+    rebuildDoneIndex(); rebuildSubIndex();
     return true;
   }catch(e){ return false; }
 }
@@ -1649,7 +1650,9 @@ const MIGRATIONS = [
   { file:'2026-08-tasks.sql',
     checks:[['tasks','due_date,subtasks,done,completed_at']] },
   { file:'2026-08-move.sql',
-    checks:[['schedules','moves']] }
+    checks:[['schedules','moves']] },
+  { file:'2026-08-subitems.sql',
+    checks:[['schedules','subtasks'], ['events','subtasks'], ['sub_done','sub_id']] }
 ];
 async function checkSchema(){
   if(!sb || !session) return;
@@ -1678,12 +1681,13 @@ async function checkSchema(){
 async function pullAll(){
   if(!sb || !session) return;
   try{
-    const [a,b,c,d,e] = await Promise.all([
+    const [a,b,c,d,e,f] = await Promise.all([
       sb.from('schedules').select('*'),
       sb.from('events').select('*'),
       sb.from('completions').select('*'),
       sb.from('categories').select('*'),
-      sb.from('tasks').select('*')
+      sb.from('tasks').select('*'),
+      sb.from('sub_done').select('*')
     ]);
     const bad = [a,b,c,d].find(r=>r.error);
     if(bad){ throw bad.error; }
@@ -1695,8 +1699,10 @@ async function pullAll(){
     // tasks 是後來才加的資料表：還沒跑 migration 的帳號讀不到，
     // 這時保留本機既有的內容就好，不要讓整包同步失敗（頂端會有紅色提示列）
     if(!e.error) state.tasks = e.data || [];
+    // sub_done 同理，是更後面才加的表
+    if(!f.error) state.subDone = f.data || [];
     migrateCatColors();
-    rebuildDoneIndex();
+    rebuildDoneIndex(); rebuildSubIndex();
     state.loaded = true;
     saveCache();
     render();
@@ -1728,9 +1734,12 @@ function deleteSchedule(id){
   state.schedules = state.schedules.filter(x=>x.id!==id);
   const gone = state.completions.filter(c=>c.item_id===id);
   state.completions = state.completions.filter(c=>c.item_id!==id);
-  rebuildDoneIndex(); saveCache();
+  const goneSub = state.subDone.filter(x=>x.item_id===id);
+  state.subDone = state.subDone.filter(x=>x.item_id!==id);
+  rebuildDoneIndex(); rebuildSubIndex(); saveCache();
   enqueue({type:'delete', table:'schedules', id});
   for(const c of gone) enqueue({type:'delete', table:'completions', id:c.id});
+  for(const x of goneSub) enqueue({type:'delete', table:'sub_done', id:x.id});
 }
 function saveEvent(row){
   row.user_id = session.user.id;
@@ -1741,9 +1750,12 @@ function deleteEvent(id){
   state.events = state.events.filter(x=>x.id!==id);
   const gone = state.completions.filter(c=>c.item_id===id);
   state.completions = state.completions.filter(c=>c.item_id!==id);
-  rebuildDoneIndex(); saveCache();
+  const goneSub = state.subDone.filter(x=>x.item_id===id);
+  state.subDone = state.subDone.filter(x=>x.item_id!==id);
+  rebuildDoneIndex(); rebuildSubIndex(); saveCache();
   enqueue({type:'delete', table:'events', id});
   for(const c of gone) enqueue({type:'delete', table:'completions', id:c.id});
+  for(const x of goneSub) enqueue({type:'delete', table:'sub_done', id:x.id});
 }
 function saveTask(row){
   row.user_id = session.user.id;
@@ -1772,6 +1784,38 @@ function toggleSub(id, i){
    否則整頁的已完成項目每次重畫都會一起跳。 */
 let popKey = null;
 const takePop = k => { const hit = popKey === k; if(hit) popKey = null; return hit ? ' pop' : ''; };
+
+/* ---------- 排程／行程的子事項 ----------
+   定義存在項目自己身上（subtasks = [{id,title}]），至於「哪一天勾了哪一項」
+   另外記在 sub_done。重複排程會在很多天出現，勾選必須逐次計算——今天把
+   「準備投影片」勾掉，明天再看應該要是空的，跟項目本身的完成同一個道理。 */
+const itemSubs = r => Array.isArray(r && r.subtasks) ? r.subtasks : [];
+const subKey = (itemId, subId, date) => itemId + '|' + subId + '|' + date;
+function rebuildSubIndex(){
+  state.subIndex = new Map();
+  for(const x of state.subDone) state.subIndex.set(subKey(x.item_id, x.sub_id, x.occur_date), x);
+}
+const isSubDone = (itemId, subId, date) => state.subIndex.has(subKey(itemId, subId, date));
+/** 某一天的完成度。沒有子事項就回 m:0，呼叫端據此決定要不要畫進度。 */
+function subProgress(row, date){
+  const a = itemSubs(row);
+  return { n: a.filter(x=>isSubDone(row.id, x.id, date)).length, m: a.length };
+}
+function toggleSubDone(itemId, kind, subId, date){
+  const cur = state.subIndex.get(subKey(itemId, subId, date));
+  popKey = cur ? null : subKey(itemId, subId, date);
+  if(cur){
+    state.subDone = state.subDone.filter(x=>x.id!==cur.id);
+    rebuildSubIndex(); saveCache();
+    enqueue({type:'delete', table:'sub_done', id:cur.id});
+  }else{
+    const row = { id:uid(), user_id:session.user.id, item_id:itemId,
+                  item_kind:kind, sub_id:subId, occur_date:date };
+    state.subDone.push(row);
+    rebuildSubIndex(); saveCache();
+    enqueue({type:'upsert', table:'sub_done', row});
+  }
+}
 
 function toggleDone(itemId, kind, date){
   const cur = state.doneIndex.get(doneKey(itemId,date));
@@ -2097,6 +2141,7 @@ function renderDay(){
       ? `<span class="tag ev">${it.span>1?`多日行程 第 ${it.dayIndex}/${it.span} 天`:'單一行程'}</span>`
       : `<span class="tag">${esc(whenLabel(r))}</span>`)
       + (it.moved ? `<span class="tag mv">原 ${esc(mdDate(it.origin))} 挪來</span>` : '');
+    const sp = subProgress(r, ds);                 // 子事項完成度（那一天的）
     return `<div class="drow ${ev?'evt':''} ${r.important?'imp':''} ${dn?'done':''}${takePop(doneKey(r.id, ds))}" data-id="${esc(r.id)}" data-k="${it.kind}" style="${style}">
       <button class="ck ${dn?'on':''}" data-act="ck" aria-label="標記完成">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>
@@ -2108,6 +2153,10 @@ function renderDay(){
           ${kindTag}
           ${r.category?`<span class="tag"><i class="cd" style="background:${col}"></i>${esc(r.category)}</span>`:''}
         </span>
+        ${sp.m?`<span class="pgs" style="--c:${col}">
+          <span class="pips">${itemSubs(r).map(x=>`<i class="${isSubDone(r.id, x.id, ds)?'on':''}"></i>`).join('')}</span>
+          <span class="pn ${sp.n===sp.m?'full':''}">${sp.n}/${sp.m}</span>
+        </span>`:''}
       </button>
     </div>`;
   }).join('');
@@ -2424,6 +2473,9 @@ function readSubs(root){
   })).filter(x=>x.title);
 }
 
+/** 排程／行程的子事項只存定義，不存 done——勾選逐日記在 sub_done。 */
+const readItemSubs = root => readSubs(root).map(({id, title})=>({ id, title }));
+
 function openTaskForm(existing){
   const t = existing || { id:uid(), title:'', description:'', due_date:null,
     category:'', important:false, done:false, completed_at:null, subtasks:[], links:[] };
@@ -2522,6 +2574,29 @@ function modal({title, body, footer, onClose}){
 /* ============================================================
    詳細內容
    ============================================================ */
+/** 詳細內容裡的子事項面板。date 為 null 表示沒有指定哪一天，只列出項目。 */
+function subsPanelHTML(row, kind, date){
+  const a = itemSubs(row);
+  if(!a.length) return '';
+  if(!date){
+    return `<p class="dv-note" style="margin:0 0 9px">勾選是每一次各自記錄的，請到月曆點開某一天再勾。</p>` +
+      a.map(x=>`<div class="sub" style="cursor:default">
+        <span class="ck" style="pointer-events:none">${CK_SVG}</span>
+        <span class="st">${esc(x.title)}</span></div>`).join('');
+  }
+  const { n, m } = subProgress(row, date);
+  return `<div class="pgs" style="margin:0 0 9px;--c:${catColor(row.category)}">
+      <span class="pips">${a.map(x=>`<i class="${isSubDone(row.id, x.id, date)?'on':''}"></i>`).join('')}</span>
+      <span class="pn ${n===m?'full':''}">${n}/${m}</span>
+    </div>` +
+    a.map(x=>{
+      const on = isSubDone(row.id, x.id, date);
+      return `<button class="sub ${on?'on':''}${takePop(subKey(row.id, x.id, date))}" data-sub="${esc(x.id)}">
+        <span class="ck ${on?'on':''}" style="pointer-events:none">${CK_SVG}</span>
+        <span class="st">${esc(x.title)}</span></button>`;
+    }).join('');
+}
+
 function openDetail({kind, row, mode, date}){
   const links = Array.isArray(row.links) ? row.links : [];
   const isEvt = kind === 'event';
@@ -2586,6 +2661,14 @@ function openDetail({kind, row, mode, date}){
     </div>`;
   }
 
+  /* 子事項。有日期（從月曆點進來）才能勾——勾選是那一天的；
+     從「重複排程」頁點進來沒有日期，就只列出項目本身。 */
+  const subs = itemSubs(row);
+  if(subs.length){
+    body += `<div class="dv-sec"><h3>子事項</h3><div id="dv-subs">${
+      subsPanelHTML(row, kind, mode==='calendar' ? date : null)}</div></div>`;
+  }
+
   body += `<div class="dv-sec">
     <h3>敘述</h3>
     <div class="dv-txt">${row.description ? esc(row.description) : '<span style="color:var(--muted)">（未填寫）</span>'}</div>
@@ -2610,6 +2693,18 @@ function openDetail({kind, row, mode, date}){
   }
 
   const m = modal({ title: (row.important?STAR+' ':'') + esc(row.title), body, footer });
+
+  const wireSubBtns = ()=>{
+    const box = $('#dv-subs', m.ov);
+    if(!box) return;
+    $$('.sub[data-sub]', box).forEach(b=>b.onclick = ()=>{
+      toggleSubDone(row.id, kind, b.dataset.sub, date);
+      box.innerHTML = subsPanelHTML(row, kind, date);
+      wireSubBtns();
+      renderCal(); renderDay();      // 後面的月曆與當日清單同步更新
+    });
+  };
+  wireSubBtns();
 
   const ck = $('#dv-ck', m.ov);
   if(ck) ck.onclick = ()=>{
@@ -2855,6 +2950,10 @@ function openScheduleForm(existing){
       <input id="f-time" class="inp" value="${esc(s.time_text||'')}" placeholder="例：08:00、晨會後" maxlength="40"></div>
     <div class="fld"><label for="f-cat">類別</label>${catSelectHTML(s.category)}</div>
     ${impToggleHTML(s.important)}
+    <div class="fld"><label>子事項（選填）</label>${subsFieldHTML(itemSubs(s))}
+      <p class="hint">勾選是<b>每一次各自記錄</b>的：今天勾完，下一次出現時會重新開始。
+        按住左邊的握把可拖曳調整順序（聚焦握把後用 ↑ ↓ 也可以）。
+        這裡只改名稱、順序與增刪，勾選在月曆點開那一天的內容裡。</p></div>
     <div class="fld"><label for="f-desc">敘述（選填）</label>
       <textarea id="f-desc" class="inp" placeholder="這件事要做什麼、注意事項…">${esc(s.description||'')}</textarea></div>
     <div class="fld"><label>相關連結（選填）</label>${linksHTML(s.links)}</div>`;
@@ -2890,7 +2989,7 @@ function openScheduleForm(existing){
     $$('#f-wd button', R).forEach(x=>x.classList.toggle('on', x===b));
   });
   syncFreqUI();
-  wireLinks(R); wireCat(R); wireImp(R);
+  wireLinks(R); wireCat(R); wireImp(R); wireSubs(R);
   setTimeout(()=>{ if(!existing) $('#f-title', R).focus(); }, 60);
 
   $('[data-cancel]', R).onclick = m.close;
@@ -2924,6 +3023,7 @@ function openScheduleForm(existing){
       category: ($('#f-cat', R).value === '__new__' ? '' : $('#f-cat', R).value),
       important: impValue(R),
       links: readLinks(R),
+      subtasks: readItemSubs(R),
       moves: schedMoves(s)
     };
     row.moves = pruneMoves(row);
@@ -3037,6 +3137,10 @@ function openEventForm(existing, presetDate){
       <input id="f-time" class="inp" value="${esc(e.time_text||'')}" placeholder="例：14:00" maxlength="40"></div>
     <div class="fld"><label for="f-cat">類別</label>${catSelectHTML(e.category)}</div>
     ${impToggleHTML(e.important)}
+    <div class="fld"><label>子事項（選填）</label>${subsFieldHTML(itemSubs(e))}
+      <p class="hint">勾選是<b>每一次各自記錄</b>的：今天勾完，下一次出現時會重新開始。
+        按住左邊的握把可拖曳調整順序（聚焦握把後用 ↑ ↓ 也可以）。
+        這裡只改名稱、順序與增刪，勾選在月曆點開那一天的內容裡。</p></div>
     <div class="fld"><label for="f-desc">敘述（選填）</label>
       <textarea id="f-desc" class="inp">${esc(e.description||'')}</textarea></div>
     <div class="fld"><label>相關連結（選填）</label>${linksHTML(e.links)}</div>`;
@@ -3045,7 +3149,7 @@ function openEventForm(existing, presetDate){
                   <button class="btn pri" data-save>${existing?'儲存變更':'新增行程'}</button>`;
   const m = modal({ title: existing?'編輯單一行程':'新增單一行程', body, footer });
   const R = m.ov;
-  wireLinks(R); wireCat(R); wireImp(R);
+  wireLinks(R); wireCat(R); wireImp(R); wireSubs(R);
   setTimeout(()=>{ if(!existing) $('#f-title', R).focus(); }, 60);
 
   const saveBtn = $('[data-save]', R);
@@ -3096,7 +3200,8 @@ function openEventForm(existing, presetDate){
       time_text: $('#f-time', R).value.trim(),
       category: ($('#f-cat', R).value === '__new__' ? '' : $('#f-cat', R).value),
       important: impValue(R),
-      links: readLinks(R)
+      links: readLinks(R),
+      subtasks: readItemSubs(R)
     };
     if(dates.length === 1){
       saveEvent({ ...base, id: e.id, date: dates[0],
@@ -3249,7 +3354,8 @@ function normSchedule(s){
     category: String(s.category||''),
     important: !!s.important,
     moves: normMoves(s.moves),
-    links: normLinks(s.links)
+    links: normLinks(s.links),
+    subtasks: normItemSubs(s.subtasks)
   };
 }
 function normEvent(e){
@@ -3262,8 +3368,15 @@ function normEvent(e){
     time_text: String(e.time_text||''),
     category: String(e.category||''),
     important: !!e.important,
-    links: normLinks(e.links)
+    links: normLinks(e.links),
+    subtasks: normItemSubs(e.subtasks)
   };
+}
+/** 排程／行程的子事項只有定義；done 不在這裡，逐日記在 sub_done。 */
+function normItemSubs(a){
+  return (Array.isArray(a) ? a : [])
+    .map(x=>({ id: (x && x.id) || uid(), title: String(x && x.title || '').trim() }))
+    .filter(x=>x.title);
 }
 function normTask(t){
   const title = String(t.title||'').trim();
@@ -3294,7 +3407,12 @@ function parseImport(data){
   for(const e of evt) if(e.category && !cat.includes(e.category)) cat.push(e.category);
   for(const t of tsk) if(t.category && !cat.includes(t.category)) cat.push(t.category);
   if(!sch.length && !evt.length && !tsk.length) return null;
-  return { schedules:sch, events:evt, tasks:tsk, categories:cat, source:String(data.source||'') };
+  // 子事項的逐日勾選：只收那些項目真的還在的，避免匯進孤兒紀錄
+  const ids = new Set([...sch, ...evt].map(x=>x.id));
+  const sd = (Array.isArray(data.subDone) ? data.subDone : []).filter(x=>
+    x && ids.has(x.item_id) && x.sub_id && isYmd(x.occur_date));
+  return { schedules:sch, events:evt, tasks:tsk, categories:cat, subDone:sd,
+           source:String(data.source||'') };
 }
 function applyImport(p){
   let newCat = 0;
@@ -3314,6 +3432,15 @@ function applyImport(p){
     (state.tasks.some(x=>x.id===t.id) ? (updT++) : (addT++));
     saveTask(t);
   }
+  for(const x of (p.subDone||[])){
+    if(isSubDone(x.item_id, x.sub_id, x.occur_date)) continue;
+    const row = { id: x.id || uid(), user_id: session.user.id, item_id: x.item_id,
+                  item_kind: x.item_kind === 'schedule' ? 'schedule' : 'event',
+                  sub_id: String(x.sub_id), occur_date: x.occur_date };
+    state.subDone.push(row);
+    enqueue({type:'upsert', table:'sub_done', row});
+  }
+  rebuildSubIndex(); saveCache();
   render();
   const bits = [];
   if(addS) bits.push(`新增 ${addS} 筆排程`);
@@ -3457,7 +3584,7 @@ function openPasswordForm(){
 function exportJSON(){
   const data = { exported_at:new Date().toISOString(), email:session?.user?.email,
     schedules:state.schedules, events:state.events, tasks:state.tasks,
-    completions:state.completions, categories:state.categories };
+    completions:state.completions, subDone:state.subDone, categories:state.categories };
   const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);

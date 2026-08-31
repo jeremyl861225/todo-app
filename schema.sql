@@ -39,6 +39,7 @@ create table if not exists public.schedules (
   important   boolean not null default false,   -- 重大事件
   moves       jsonb not null default '{}'::jsonb, -- 單次改期例外 {"原本日期":"改到的日期"}
   links       jsonb not null default '[]'::jsonb,
+  subtasks    jsonb not null default '[]'::jsonb,  -- [{id, title}]；勾選逐日記在 sub_done
   created_at  timestamptz not null default now(),
   constraint schedules_range_check
     check (end_date is null or start_date is null or end_date >= start_date)
@@ -56,6 +57,7 @@ create table if not exists public.events (
   category    text default '',
   important   boolean not null default false,   -- 重大事件
   links       jsonb not null default '[]'::jsonb,
+  subtasks    jsonb not null default '[]'::jsonb,  -- [{id, title}]；勾選逐日記在 sub_done
   created_at  timestamptz not null default now(),
   constraint events_range_check check (end_date is null or end_date >= date)
 );
@@ -87,6 +89,21 @@ create table if not exists public.completions (
   unique (user_id, item_id, occur_date)
 );
 
+-- 子事項的逐日勾選。重複排程會在很多天出現，勾選必須逐次計算，
+-- 所以跟 completions 一樣以 (項目, 日期) 為鍵，再多一個 sub_id。
+create table if not exists public.sub_done (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  item_id    uuid not null,
+  item_kind  text not null check (item_kind in ('schedule','event')),
+  sub_id     text not null,
+  occur_date date not null,
+  created_at timestamptz not null default now(),
+  unique (user_id, item_id, sub_id, occur_date)
+);
+
+create index if not exists sub_done_lookup on public.sub_done (user_id, occur_date);
+create index if not exists sub_done_item   on public.sub_done (user_id, item_id);
 create index if not exists completions_lookup
   on public.completions (user_id, occur_date);
 create index if not exists schedules_user on public.schedules (user_id);
@@ -102,12 +119,13 @@ alter table public.categories  enable row level security;
 alter table public.schedules   enable row level security;
 alter table public.events      enable row level security;
 alter table public.completions enable row level security;
+alter table public.sub_done    enable row level security;
 alter table public.tasks       enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['categories','schedules','events','completions','tasks'] loop
+  foreach t in array array['categories','schedules','events','completions','tasks','sub_done'] loop
     execute format('drop policy if exists own_select on public.%I', t);
     execute format('drop policy if exists own_insert on public.%I', t);
     execute format('drop policy if exists own_update on public.%I', t);
