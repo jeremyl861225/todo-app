@@ -45,12 +45,13 @@
 /* ---------- 淺色：燕麥紙。色票的橄欖與赭石落在暖砂底上 ---------- */
 :root{
   color-scheme:light;
-  /* 棉紙白：帶一點暖灰的手工紙，不是純白 */
-  --bg:#F5F3EA;          --bg2:#DFE3C6;
-  --card:#FDFCF7;        --card2:#EFEDE0;
-  --line:#D5D2BD;        --line-soft:#E7E4D3;
+  /* 棉紙白：帶一點暖灰的手工紙，不是純白。
+     中性表面的彩度都壓在 15 以下——底色一有黃味，上面的藍綠與綠就會被帶濁。 */
+  --bg:#F8F7F2;          --bg2:#E5E8D2;
+  --card:#FFFEFC;        --card2:#F2F1EB;
+  --line:#DCD9CE;        --line-soft:#EBE9E1;
   --ink:#133E50;         --ink2:#3D6070;       --muted:#49646F;
-  --tick:#E3E1CF;                              /* 節奏條的空檔 */
+  --tick:#E7E5DC;                              /* 節奏條的空檔 */
 
   /* 藍綠＝可互動（選取、時間、主要動作） */
   --accent:#2A7574;      --accent-ink:#1E5E5D;
@@ -66,8 +67,8 @@
 
   --imp-ring:rgba(244,161,79,.62);
   --imp-ring-hi:rgba(244,161,79,.9);
-  --bg-blur:rgba(245,243,234,.88);
-  --nav-bg:rgba(253,252,247,.94);
+  --bg-blur:rgba(248,247,242,.88);
+  --nav-bg:rgba(255,254,252,.94);
   --scrim:rgba(19,62,80,.42);
   --toast-bg:#133E50;    --toast-ink:#EFF4F3;
   --toast-bad:#A83F17;   --toast-bad-ink:#FDF1EB;
@@ -2024,6 +2025,26 @@ function renderList(){
   });
 }
 
+/** 某一天之內的顯示順序，月曆格子與當日面板共用：
+      1. 已完成一律沉到最後（重大事件完成後也一樣沉底）
+      2. 未完成之中，重大事件排最前面
+      3. 其餘照時間先後
+      4. 沒填時間的排在有填時間的後面
+    同一層分不出高下時回 0，交給 itemsOn() 既有的排序（種類、頻率、標題）—— sort 是穩定的。 */
+function cmpOnDay(ds){
+  const tm = r => String(r.time_text || '').trim();
+  return (a, b) => {
+    const da = isDone(a.row.id, ds) ? 1 : 0, db = isDone(b.row.id, ds) ? 1 : 0;
+    if(da !== db) return da - db;
+    const ia = a.row.important ? 0 : 1, ib = b.row.important ? 0 : 1;
+    if(ia !== ib) return ia - ib;
+    const ta = tm(a.row), tb = tm(b.row);
+    if(!!ta !== !!tb) return ta ? -1 : 1;
+    if(ta && tb && ta !== tb) return ta.localeCompare(tb);
+    return 0;
+  };
+}
+
 /* ============================================================
    繪製：頁面二（月曆）
    ============================================================ */
@@ -2108,9 +2129,8 @@ function renderCal(){
       // 已經畫成橫桿的多日行程，不再重複出現在格子裡
       const items = itemsOn(ds).filter(it =>
         !(it.kind === 'event' && it.span > 1 && !spillIds.has(it.row.id)));
-      // 格子只放得下前幾筆，未完成的排前面，才不會被已完成的擠掉
-      const shown = items.slice().sort((a,b)=>
-        (isDone(a.row.id, ds) ? 1 : 0) - (isDone(b.row.id, ds) ? 1 : 0));
+      // 格子只放得下前幾筆，用跟下面當日面板同一套順序挑，才不會挑出不一樣的三筆
+      const shown = items.slice().sort(cmpOnDay(ds));
     const dots = shown.slice(0,8).map(it=>{
       const done = isDone(it.row.id, ds);
       const col = catColor(it.row.category);
@@ -2188,9 +2208,7 @@ function renderDay(){
     box.innerHTML = `<div class="dnone">這天沒有排程。<br>可用右下角新增單一行程。</div>`;
     return;
   }
-  // 未完成排在已完成上面（同一組內維持原本的時間／類型排序）
-  const ordered = items.slice().sort((a,b)=>
-    (isDone(a.row.id, ds) ? 1 : 0) - (isDone(b.row.id, ds) ? 1 : 0));
+  const ordered = items.slice().sort(cmpOnDay(ds));
   box.innerHTML = ordered.map(it=>{
     const r = it.row, dn = isDone(r.id, ds);
     const ev = it.kind === 'event';
