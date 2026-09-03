@@ -45,91 +45,109 @@
 /* ---------- 淺色：燕麥紙。色票的橄欖與赭石落在暖砂底上 ---------- */
 :root{
   color-scheme:light;
-  --bg:#F2EFE3;          --bg2:#E8E3D3;
-  --card:#FDFBF3;        --card2:#F8F4E6;
-  --line:#DBD4BE;        --line-soft:#EBE5D4;
-  --ink:#2B190B;         --ink2:#4A2F1A;       --muted:#786450;
-  --tick:#E3DCC6;                              /* 節奏條的空檔 */
+  /* 棉紙白：帶一點暖灰的手工紙，不是純白 */
+  --bg:#F5F3EA;          --bg2:#DFE3C6;
+  --card:#FDFCF7;        --card2:#EFEDE0;
+  --line:#D5D2BD;        --line-soft:#E7E4D3;
+  --ink:#133E50;         --ink2:#3D6070;       --muted:#49646F;
+  --tick:#E3E1CF;                              /* 節奏條的空檔 */
 
-  --accent:#4A2F1A;      --accent-ink:#2F1D0C;
-  --accent-soft:#EFE7DB; --accent-line:#D7C6B2; --on-accent:#FDFBF3;
-  --hot:#9A682F;         --hot-ink:#7C5222;
-  --hot-soft:#F6E9D6;    --hot-line:#E7D1AF;    --on-hot:#FFFBF2;
-  --danger:#8A2E26;      --danger-soft:#F8E8E4; --danger-line:#E6C9C2;
+  /* 藍綠＝可互動（選取、時間、主要動作） */
+  --accent:#2A7574;      --accent-ink:#1E5E5D;
+  --accent-soft:#DCEBE8; --accent-line:#A9CFCC; --on-accent:#FDFCF7;
+  /* 綠＝完成，跟「可互動」分開，勾掉的東西一眼看得出來 */
+  --done:#38764A;        --done-ink:#2F6B41;
+  --done-soft:#E2F1DE;   --done-line:#B7DCB0;   --on-done:#FDFCF7;
+  /* 橘＝重大與今天；螢光筆也用它 */
+  --hot:#F4A14F;         --hot-ink:#8A4A12;
+  --hot-mark:#B9660F;    /* --hot 當底色很好，當字或圖示都過不了對比，圖示改用這個 */
+  --hot-soft:#FBE7CE;    --hot-line:#EFC793;    --on-hot:#133E50;
+  --danger:#A83F17;      --danger-soft:#FAE4DA; --danger-line:#E9BCA5;
 
-  --imp-ring:rgba(161,109,49,.34);
-  --imp-ring-hi:rgba(161,109,49,.5);
-  --bg-blur:rgba(242,239,227,.88);
-  --nav-bg:rgba(253,251,243,.94);
-  --scrim:rgba(43,25,11,.44);
-  --toast-bg:#2B190B;    --toast-ink:#F2EFE3;
-  --toast-bad:#481816;   --toast-bad-ink:#FBEDE9;
+  --imp-ring:rgba(244,161,79,.62);
+  --imp-ring-hi:rgba(244,161,79,.9);
+  --bg-blur:rgba(245,243,234,.88);
+  --nav-bg:rgba(253,252,247,.94);
+  --scrim:rgba(19,62,80,.42);
+  --toast-bg:#133E50;    --toast-ink:#EFF4F3;
+  --toast-bad:#A83F17;   --toast-bad-ink:#FDF1EB;
 
-  --sh-1:0 1px 2px rgba(43,25,11,.07);
-  --sh-2:0 1px 2px rgba(43,25,11,.06), 0 8px 24px rgba(43,25,11,.10);
-  --sh-3:0 24px 64px rgba(43,25,11,.28);
-  --sh-fab:0 6px 20px rgba(74,47,26,.32);
-  --sh-fab-hi:0 10px 26px rgba(74,47,26,.38);
+  --sh-1:0 1px 2px rgba(19,62,80,.07);
+  --sh-2:0 1px 2px rgba(19,62,80,.06), 0 8px 24px rgba(19,62,80,.1);
+  --sh-3:0 24px 64px rgba(19,62,80,.26);
+  --sh-fab:0 6px 20px rgba(19,62,80,.3);
+  --sh-fab-hi:0 10px 26px rgba(19,62,80,.36);
+  --mark-img:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 30' preserveAspectRatio='none'%3E%3Cg fill='%23F4A14F'%3E%3Cpath d='M2.5 9.8C36 4.2 70 12.4 104 7.6 138 2.9 168 10.6 197.5 4.2L198.6 21.4C170 28.4 138 20.6 104 25.4 68 30.5 34 22.6 3.4 27.9Z' fill-opacity='.55'/%3E%3Cpath d='M5 11.6C20 8.8 33 13.2 47 10.4L48 25C33 27.8 20 23.6 5.6 26.4Z' fill-opacity='.3'/%3E%3Cpath d='M120 6.6C140 4 158 9.6 176 5.6L177 20.8C159 24.4 141 19.2 121 22Z' fill-opacity='.22'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 /* ---------- 深色：濃咖啡。底色直接取色票最深的兩階，值班半夜開這個 App 不該被白底閃到 ---------- */
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
     color-scheme:dark;
-    --bg:#16100A;          --bg2:#241708;
-    --card:#1E1509;        --card2:#2B190B;
-    --line:#4A2F1A;        --line-soft:#33210F;
-    --ink:#F1E9D6;         --ink2:#C9BEA2;       --muted:#9A8B6E;
-    --tick:#3A2814;
+    /* 深色是把棉紙換成深靛藍的紙，不是把淺色反過來 */
+    --bg:#0A1D26;          --bg2:#16333F;
+    --card:#0F2833;        --card2:#15323E;
+    --line:#2A4E5C;        --line-soft:#1B3C49;
+    --ink:#EAF1F0;         --ink2:#A9C4C6;       --muted:#83A3A9;
+    --tick:#1E3B47;
 
-    --accent:#B8BA92;      --accent-ink:#CBCDA8;
-    --accent-soft:#25261A; --accent-line:#4C4E33; --on-accent:#1E1F10;
-    --hot:#D2954E;         --hot-ink:#E5B478;
-    --hot-soft:#2E2010;    --hot-line:#4C3418;    --on-hot:#21160A;
-    --danger:#E0897A;      --danger-soft:#2E1512; --danger-line:#58231D;
+    --accent:#5BA7A6;      --accent-ink:#8FCBC9;
+    --accent-soft:#12333B; --accent-line:#2C5F63; --on-accent:#0A1D26;
+    --done:#A7DBA0;        --done-ink:#B9E3B3;
+    --done-soft:#14301F;   --done-line:#2E5A34;   --on-done:#0F2A18;
+    --hot:#F4A14F;         --hot-ink:#F6B978;
+  --hot-mark:#F4A14F;    /* 深色底上橘色本來就夠亮，不必再壓 */
+    --hot-soft:#33220F;    --hot-line:#5A3C18;    --on-hot:#2A1704;
+    --danger:#E97552;      --danger-soft:#33190F; --danger-line:#5A2E1C;
 
-    --imp-ring:rgba(210,149,78,.42);
-    --imp-ring-hi:rgba(210,149,78,.62);
-    --bg-blur:rgba(22,16,10,.88);
-    --nav-bg:rgba(30,21,9,.94);
-    --scrim:rgba(0,0,0,.66);
-    --toast-bg:#EDE5D2;    --toast-ink:#241708;
-    --toast-bad:#E0897A;   --toast-bad-ink:#2A100D;
+    --imp-ring:rgba(244,161,79,.5);
+    --imp-ring-hi:rgba(244,161,79,.78);
+    --bg-blur:rgba(10,29,38,.88);
+    --nav-bg:rgba(15,40,51,.94);
+    --scrim:rgba(0,0,0,.62);
+    --toast-bg:#EAF1F0;    --toast-ink:#0F2833;
+    --toast-bad:#E97552;   --toast-bad-ink:#2A0F06;
 
     --sh-1:0 1px 2px rgba(0,0,0,.34);
     --sh-2:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.42);
     --sh-3:0 24px 64px rgba(0,0,0,.66);
     --sh-fab:0 6px 20px rgba(0,0,0,.5);
     --sh-fab-hi:0 10px 26px rgba(0,0,0,.6);
+  --mark-img:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 30' preserveAspectRatio='none'%3E%3Cg fill='%23F4A14F'%3E%3Cpath d='M2.5 9.8C36 4.2 70 12.4 104 7.6 138 2.9 168 10.6 197.5 4.2L198.6 21.4C170 28.4 138 20.6 104 25.4 68 30.5 34 22.6 3.4 27.9Z' fill-opacity='.3'/%3E%3Cpath d='M5 11.6C20 8.8 33 13.2 47 10.4L48 25C33 27.8 20 23.6 5.6 26.4Z' fill-opacity='.17'/%3E%3Cpath d='M120 6.6C140 4 158 9.6 176 5.6L177 20.8C159 24.4 141 19.2 121 22Z' fill-opacity='.13'/%3E%3C/g%3E%3C/svg%3E");
   }
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
-  --bg:#16100A;          --bg2:#241708;
-  --card:#1E1509;        --card2:#2B190B;
-  --line:#4A2F1A;        --line-soft:#33210F;
-  --ink:#F1E9D6;         --ink2:#C9BEA2;       --muted:#9A8B6E;
-  --tick:#3A2814;
+  /* 深色是把棉紙換成深靛藍的紙，不是把淺色反過來 */
+  --bg:#0A1D26;          --bg2:#16333F;
+  --card:#0F2833;        --card2:#15323E;
+  --line:#2A4E5C;        --line-soft:#1B3C49;
+  --ink:#EAF1F0;         --ink2:#A9C4C6;       --muted:#83A3A9;
+  --tick:#1E3B47;
 
-  --accent:#B8BA92;      --accent-ink:#CBCDA8;
-  --accent-soft:#25261A; --accent-line:#4C4E33; --on-accent:#1E1F10;
-  --hot:#D2954E;         --hot-ink:#E5B478;
-  --hot-soft:#2E2010;    --hot-line:#4C3418;    --on-hot:#21160A;
-  --danger:#E0897A;      --danger-soft:#2E1512; --danger-line:#58231D;
+  --accent:#5BA7A6;      --accent-ink:#8FCBC9;
+  --accent-soft:#12333B; --accent-line:#2C5F63; --on-accent:#0A1D26;
+  --done:#A7DBA0;        --done-ink:#B9E3B3;
+  --done-soft:#14301F;   --done-line:#2E5A34;   --on-done:#0F2A18;
+  --hot:#F4A14F;         --hot-ink:#F6B978;
+  --hot-mark:#F4A14F;    /* 深色底上橘色本來就夠亮，不必再壓 */
+  --hot-soft:#33220F;    --hot-line:#5A3C18;    --on-hot:#2A1704;
+  --danger:#E97552;      --danger-soft:#33190F; --danger-line:#5A2E1C;
 
-  --imp-ring:rgba(210,149,78,.42);
-  --imp-ring-hi:rgba(210,149,78,.62);
-  --bg-blur:rgba(22,16,10,.88);
-  --nav-bg:rgba(30,21,9,.94);
-  --scrim:rgba(0,0,0,.66);
-  --toast-bg:#EDE5D2;    --toast-ink:#241708;
-  --toast-bad:#E0897A;   --toast-bad-ink:#2A100D;
+  --imp-ring:rgba(244,161,79,.5);
+  --imp-ring-hi:rgba(244,161,79,.78);
+  --bg-blur:rgba(10,29,38,.88);
+  --nav-bg:rgba(15,40,51,.94);
+  --scrim:rgba(0,0,0,.62);
+  --toast-bg:#EAF1F0;    --toast-ink:#0F2833;
+  --toast-bad:#E97552;   --toast-bad-ink:#2A0F06;
 
   --sh-1:0 1px 2px rgba(0,0,0,.34);
   --sh-2:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.42);
   --sh-3:0 24px 64px rgba(0,0,0,.66);
   --sh-fab:0 6px 20px rgba(0,0,0,.5);
   --sh-fab-hi:0 10px 26px rgba(0,0,0,.6);
+  --mark-img:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 30' preserveAspectRatio='none'%3E%3Cg fill='%23F4A14F'%3E%3Cpath d='M2.5 9.8C36 4.2 70 12.4 104 7.6 138 2.9 168 10.6 197.5 4.2L198.6 21.4C170 28.4 138 20.6 104 25.4 68 30.5 34 22.6 3.4 27.9Z' fill-opacity='.3'/%3E%3Cpath d='M5 11.6C20 8.8 33 13.2 47 10.4L48 25C33 27.8 20 23.6 5.6 26.4Z' fill-opacity='.17'/%3E%3Cpath d='M120 6.6C140 4 158 9.6 176 5.6L177 20.8C159 24.4 141 19.2 121 22Z' fill-opacity='.13'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 /* ---------- 基礎 ---------- */
@@ -301,7 +319,7 @@ main{padding:var(--s-6) 0 var(--s-9)}
 /* ---------- 重大事件 ---------- */
 /* 星號本身當成一個 1em 的方框，SVG 撐滿它——
    用 inline-block 時 SVG 會落在基線上，下方留出降部空間，看起來就偏高了。 */
-.star{color:var(--hot);flex:none;display:inline-flex;align-items:center;justify-content:center;
+.star{color:var(--hot-mark);flex:none;display:inline-flex;align-items:center;justify-content:center;
   width:1em;height:1em;vertical-align:-.14em}
 span.star svg{width:100%;height:100%;display:block}
 .item .ti .star{margin-right:5px}
@@ -318,7 +336,7 @@ span.star svg{width:100%;height:100%;display:block}
 .impbtn:hover{background:var(--bg2)}
 .impbtn[aria-pressed="true"]{background:var(--hot-soft);border-color:var(--hot-line)}
 .impbtn .bigstar{width:21px;height:21px;color:var(--line);transition:color var(--d-1);flex:none;display:block}
-.impbtn[aria-pressed="true"] .bigstar{color:var(--hot)}
+.impbtn[aria-pressed="true"] .bigstar{color:var(--hot-mark)}
 .impbtn .tx{flex:1;min-width:0}
 .impbtn .tx b{display:block;font-size:var(--t-lg);font-weight:600;color:var(--ink)}
 .impbtn .tx small{display:block;font-size:var(--t-xs);color:var(--muted);margin-top:2px;line-height:1.5}
@@ -354,11 +372,11 @@ span.star svg{width:100%;height:100%;display:block}
   background:var(--tick);box-shadow:inset 0 0 0 1px var(--line-soft)}
 .pips i.on{background:var(--c);box-shadow:inset 0 0 0 1px var(--c)}
 .pn{font-size:var(--t-2xs);color:var(--muted);flex:none;font-variant-numeric:tabular-nums}
-.pn.full{color:var(--accent-ink);font-weight:700}
+.pn.full{color:var(--done-ink);font-weight:700}
 .tag.due{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
 .tag.today{background:var(--hot-soft);color:var(--hot-ink);font-weight:600}
 .tag.late{background:var(--danger-soft);color:var(--danger);font-weight:600}
-.tag.did{background:var(--accent-soft);color:var(--accent-ink)}
+.tag.did{background:var(--done-soft);color:var(--done-ink)}
 .tag.did svg{width:11px;height:11px;flex:none}
 
 /* 詳細內容裡的子任務 */
@@ -366,7 +384,7 @@ span.star svg{width:100%;height:100%;display:block}
   padding:10px 12px;border-radius:var(--r-sm);border:1px solid var(--line-soft);
   background:var(--card2);transition:background var(--d-1),border-color var(--d-1)}
 .sub:hover{background:var(--bg2)}
-.sub.on{background:var(--accent-soft);border-color:var(--accent-line)}
+.sub.on{background:var(--done-soft);border-color:var(--done-line)}
 .sub .ck{width:21px;height:21px;border-radius:var(--r-xs);margin-top:0}
 .sub .ck svg{width:12px;height:12px}
 .sub .st{flex:1;min-width:0;font-size:var(--t-md);line-height:1.55;word-break:break-word}
@@ -428,7 +446,7 @@ span.star svg{width:100%;height:100%;display:block}
 .cal .dow{display:grid;grid-template-columns:repeat(7,1fr);background:var(--card2);
   border-bottom:1px solid var(--line-soft)}
 .cal .dow span{text-align:center;font-size:var(--t-2xs);color:var(--muted);padding:9px 0;font-weight:600;letter-spacing:.08em}
-.cal .dow span.we{color:var(--hot)}
+.cal .dow span.we{color:var(--hot-ink)}
 .cal .grid{display:flex;flex-direction:column}
 .week{position:relative}
 .wk-days{display:grid;grid-template-columns:repeat(7,1fr)}
@@ -446,9 +464,9 @@ span.star svg{width:100%;height:100%;display:block}
 .bar-ev.openL{border-top-left-radius:1px;border-bottom-left-radius:1px;margin-left:0}
 .bar-ev.openR{border-top-right-radius:1px;border-bottom-right-radius:1px;margin-right:0}
 /* 重大事件加圈，與圓點的處理一致 */
-.bar-ev.imp{box-shadow:0 0 0 1.5px var(--hot)}
+.bar-ev.imp{box-shadow:0 0 0 1.5px var(--hot-mark)}
 .bar-ev.done{background:transparent;box-shadow:inset 0 0 0 1px var(--c);opacity:.45}
-.bar-ev.done.imp{box-shadow:inset 0 0 0 1px var(--c), 0 0 0 1.5px var(--hot)}
+.bar-ev.done.imp{box-shadow:inset 0 0 0 1px var(--c), 0 0 0 1.5px var(--hot-mark)}
 .cell .lanes{flex:none;display:block}
 .cell{
   position:relative;border-right:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);
@@ -461,6 +479,7 @@ span.star svg{width:100%;height:100%;display:block}
 .cell.out .dn{color:var(--muted)}
 .cell.out .dots{opacity:.55}
 .cell:hover{background:var(--card2)}
+.cell:active{background:var(--accent-soft)}
 .cell .dn{font-size:var(--t-sm);font-weight:600;color:var(--ink2);width:23px;height:23px;
   display:grid;place-items:center;border-radius:50%;flex:none}
 .cell.today .dn{background:var(--hot);color:var(--on-hot)}
@@ -568,14 +587,43 @@ span.star svg{width:100%;height:100%;display:block}
 .ck{width:23px;height:23px;border-radius:7px;border:1.8px solid var(--line);background:var(--card);
   flex:none;display:grid;place-items:center;margin-top:1px;
   transition:background var(--d-2) var(--e-out),border-color var(--d-2)}
-.ck:hover{border-color:var(--accent)}
-.ck.on{background:var(--accent);border-color:var(--accent)}
-.ck svg{width:13px;height:13px;color:var(--on-accent);opacity:0}
+.ck:hover{border-color:var(--done)}
+.ck.on{background:var(--done);border-color:var(--done)}
+.ck svg{width:13px;height:13px;color:var(--on-done);opacity:0}
 .ck.on svg{opacity:1}
 .dmain{flex:1;min-width:0;text-align:left}
 .dt{display:block;font-size:var(--t-md);font-weight:600;line-height:1.45;word-break:break-word}
 .dsub{display:flex;flex-wrap:wrap;gap:5px;margin-top:var(--s-1)}
 .dnone{color:var(--muted);font-size:var(--t-sm);text-align:center;padding:var(--s-8) var(--s-4);line-height:1.7}
+
+/* ---------- 手繪螢光筆 ----------
+   從月曆點開某一天時，那天的重大事件名稱會被一支橘色螢光筆畫起來。
+   用 background-image 而不是絕對定位的圖層，標題折行時每一行都會各自
+   有一段筆跡（box-decoration-break:clone），不會整段糊成一塊。 */
+.hl{
+  background-image:var(--mark-img);
+  background-repeat:no-repeat;
+  /* 筆跡要蓋過字，不是墊在字底下：稍微高過字身、位置略低，像真的用螢光筆掃過 */
+  background-position:0 62%;
+  background-size:100% 112%;
+  -webkit-box-decoration-break:clone; box-decoration-break:clone;
+  padding:.08em .2em; margin:0 -.14em;
+}
+@keyframes hl-sweep{from{background-size:0% 112%}to{background-size:100% 112%}}
+/* 只在「剛換到這一天」時掃過去；在同一天勾東西不會一直重畫 */
+.drow.mk .hl{animation:hl-sweep .52s cubic-bezier(.16,1,.3,1) both}
+
+/* 換一天：讓人知道看的是另一份清單，而不是同一份被改掉了。
+   延遲有上限，長清單不會排到最後一筆還在等。 */
+@keyframes day-in{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+.dlist.swap .drow{animation:day-in .3s cubic-bezier(.16,1,.3,1) both}
+.dlist.swap .drow:nth-child(2){animation-delay:.04s}
+.dlist.swap .drow:nth-child(3){animation-delay:.08s}
+.dlist.swap .drow:nth-child(n+4){animation-delay:.11s}
+
+/* 換月：整片格線都換了，用一次很短的淡入交代，不做位移免得像在捲動 */
+@keyframes mo-in{from{opacity:0}to{opacity:1}}
+.cal .grid.swap{animation:mo-in .24s ease}
 
 /* 唯一被刻意設計的動態：勾完成的那一下。只在「剛剛切換」的那一列播放 */
 @keyframes ck-pop{0%{transform:scale(1)}36%{transform:scale(.84)}100%{transform:scale(1)}}
@@ -662,9 +710,9 @@ input[type=date]::-webkit-calendar-picker-indicator{opacity:.5;cursor:pointer}
 input[type=date]::-webkit-calendar-picker-indicator:hover{opacity:.85}
 select.inp{appearance:none;background-image:var(--sel-arrow);
   background-repeat:no-repeat;background-position:right 12px center;background-size:16px;padding-right:36px}
-:root{--sel-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23786450' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")}
-:root[data-theme="dark"]{--sel-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239A8B6E' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--sel-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239A8B6E' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")}}
+:root{--sel-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2349646F' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")}
+:root[data-theme="dark"]{--sel-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2383A3A9' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--sel-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2383A3A9' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")}}
 /* 表單裡的多選日期：一次點好幾天就建立好幾筆各自獨立的行程。
    （「這三天都要跟刀」不是一個橫跨三天的活動，用結束日期表達會是錯的語意。） */
 .mdp{border:1px solid var(--line);border-radius:var(--r-sm);background:var(--card2);overflow:hidden}
@@ -680,7 +728,7 @@ select.inp{appearance:none;background-image:var(--sel-arrow);
   font-variant-numeric:tabular-nums;transition:background .14s,color .14s}
 .mdp-grid button:hover{background:var(--bg2)}
 .mdp-grid button.out{color:var(--muted);font-weight:400}
-.mdp-grid button.today{box-shadow:inset 0 0 0 1.5px var(--hot)}
+.mdp-grid button.today{box-shadow:inset 0 0 0 1.5px var(--hot-mark)}
 .mdp-grid button.on,.mdp-grid button.on:hover{background:var(--accent);color:var(--on-accent)}
 /* 那天已經有東西了，排的時候看得到。用絕對定位墊在數字底下——當初讓它參與
    flex 排版，有點的日子數字會被往上推 3px，跟沒點的日子對不齊。
@@ -710,7 +758,7 @@ select.inp{appearance:none;background-image:var(--sel-arrow);
   transition:background var(--d-1),border-color var(--d-1),color var(--d-1)}
 .wk button:hover{background:var(--bg2)}
 .wk button.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-.wk button.we{color:var(--hot)}
+.wk button.we{color:var(--hot-ink)}
 .wk button.we.on{color:var(--on-accent)}
 .linkrow{display:flex;gap:var(--s-2);margin:0 0 var(--s-2);align-items:center}
 .linkrow .inp{height:39px;font-size:var(--t-md)}
@@ -719,7 +767,7 @@ select.inp{appearance:none;background-image:var(--sel-arrow);
 .linkrow .u{flex:1;min-width:0}
 .xbtn{width:33px;height:33px;flex:none;border-radius:var(--r-xs);display:grid;place-items:center;
   color:var(--muted);border:1px solid transparent;transition:background var(--d-1),color var(--d-1)}
-.xbtn:hover{background:var(--hot-soft);color:var(--hot)}
+.xbtn:hover{background:var(--hot-soft);color:var(--hot-mark)}
 .addlink{font-size:var(--t-sm);color:var(--accent-ink);font-weight:600;padding:var(--s-2) 2px;border-radius:var(--r-xs);
   display:inline-flex;align-items:center;gap:5px}
 .addlink svg{width:13px;height:13px;flex:none}
@@ -755,7 +803,7 @@ select.inp{appearance:none;background-image:var(--sel-arrow);
   border:1px solid var(--line);background:var(--card2);width:100%;text-align:left;
   transition:background var(--d-1),border-color var(--d-1)}
 .dv-check:hover{background:var(--bg2)}
-.dv-check.on{background:var(--accent-soft);border-color:var(--accent-line)}
+.dv-check.on{background:var(--done-soft);border-color:var(--done-line)}
 .dv-check .t{font-size:var(--t-lg);font-weight:600}
 .dv-check .s{font-size:var(--t-xs);color:var(--muted)}
 .dv-note{font-size:var(--t-xs);color:var(--muted);text-align:center;padding:2px 0 0;line-height:1.6}
@@ -2016,6 +2064,10 @@ function weekBars(weekStart){
    不是多塞一列——多一列會撐破格子高度，反而被裁掉。 */
 const CELL_CHIPS = 3;
 
+/* 動態只在「真的換了一天／一個月」時播。renderCal 與 renderDay 在勾選、
+   同步、切分頁時都會被呼叫，不記住上一次就會每次都重播一遍。 */
+let lastDayKey = null, lastMonKey = null;
+
 function renderCal(){
   const y = state.calY, m = state.calM;
   const LIM = CELL_CHIPS;
@@ -2092,7 +2144,11 @@ function renderCal(){
       <div class="wk-bars">${bars}</div>
     </div>`);
   }
-  $('#cal-grid').innerHTML = weeksHtml.join('');
+  const monKey = `${y}-${m}`, monChanged = lastMonKey !== null && lastMonKey !== monKey;
+  lastMonKey = monKey;
+  const gridEl = $('#cal-grid');
+  gridEl.classList.toggle('swap', monChanged);
+  gridEl.innerHTML = weeksHtml.join('');
 
   $$('.cell', $('#cal-grid')).forEach(c=>c.onclick = ()=>{
     state.selDate = c.dataset.d;
@@ -2118,6 +2174,8 @@ function renderCal(){
 
 function renderDay(){
   const ds = state.selDate, d = parseYmd(ds);
+  const dayChanged = lastDayKey !== null && lastDayKey !== ds;
+  lastDayKey = ds;
   $('#dp-d1').textContent = `${d.getMonth()+1} 月 ${d.getDate()} 日`;
   $('#dp-d2').textContent = `週${WD[d.getDay()]}${ds===todayStr()?' · 今天':''}`;
   const items = itemsOn(ds);
@@ -2125,6 +2183,7 @@ function renderDay(){
   $('#dp-prog').textContent = items.length ? `${done}/${items.length}` : '';
 
   const box = $('#dp-list');
+  box.classList.toggle('swap', dayChanged);
   if(!items.length){
     box.innerHTML = `<div class="dnone">這天沒有排程。<br>可用右下角新增單一行程。</div>`;
     return;
@@ -2142,12 +2201,15 @@ function renderDay(){
       : `<span class="tag">${esc(whenLabel(r))}</span>`)
       + (it.moved ? `<span class="tag mv">原 ${esc(mdDate(it.origin))} 挪來</span>` : '');
     const sp = subProgress(r, ds);                 // 子事項完成度（那一天的）
-    return `<div class="drow ${ev?'evt':''} ${r.important?'imp':''} ${dn?'done':''}${takePop(doneKey(r.id, ds))}" data-id="${esc(r.id)}" data-k="${it.kind}" style="${style}">
+    const mk = (r.important && dayChanged) ? ' mk' : '';
+    return `<div class="drow ${ev?'evt':''} ${r.important?'imp':''} ${dn?'done':''}${mk}${takePop(doneKey(r.id, ds))}" data-id="${esc(r.id)}" data-k="${it.kind}" style="${style}">
       <button class="ck ${dn?'on':''}" data-act="ck" aria-label="標記完成">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>
       </button>
       <button class="dmain" data-act="open">
-        <span class="dt">${r.important?STAR:''}${esc(r.title)}</span>
+        <span class="dt">${r.important?STAR:''}${r.important
+          ? `<span class="hl">${esc(r.title)}</span>`
+          : esc(r.title)}</span>
         <span class="dsub">
           ${r.time_text?`<span class="tag time">${esc(r.time_text)}</span>`:''}
           ${kindTag}
@@ -2481,7 +2543,7 @@ function openTaskForm(existing){
     category:'', important:false, done:false, completed_at:null, subtasks:[], links:[] };
   const body = `
     <div id="f-err" class="err hide"></div>
-    <div class="fld"><label for="f-title">名稱 <span style="color:var(--hot)">*</span></label>
+    <div class="fld"><label for="f-title">名稱 <span style="color:var(--hot-ink)">*</span></label>
       <input id="f-title" class="inp" value="${esc(t.title)}" placeholder="例：交出病歷摘要" maxlength="120"></div>
     <div class="fld"><label for="f-due">截止日（選填）</label>
       <input id="f-due" class="inp" type="date" value="${esc(t.due_date||'')}">
@@ -2902,7 +2964,7 @@ function openScheduleForm(existing){
     || (s.created_at ? String(s.created_at).slice(0,10) : today);
   const body = `
     <div id="f-err" class="err hide"></div>
-    <div class="fld"><label for="f-title">標題 <span style="color:var(--hot)">*</span></label>
+    <div class="fld"><label for="f-title">標題 <span style="color:var(--hot-ink)">*</span></label>
       <input id="f-title" class="inp" value="${esc(s.title)}" placeholder="例：CR 教學會議" maxlength="120"></div>
     <div class="fld"><label>重複頻率</label>
       <div class="seg" id="f-freq">
@@ -2940,7 +3002,7 @@ function openScheduleForm(existing){
       <div class="wk" id="f-wd">
         ${WD.map((w,i)=>`<button type="button" data-w="${i}" class="${(i===0||i===6)?'we':''} ${Number(s.weekday)===i?'on':''}">${w}</button>`).join('')}
       </div></div>
-    <div class="fld"><label for="f-start">起始日 <span style="color:var(--hot)">*</span></label>
+    <div class="fld"><label for="f-start">起始日 <span style="color:var(--hot-ink)">*</span></label>
       <input id="f-start" class="inp" type="date" value="${esc(startInit)}">
       <p class="hint">這天以前不會出現。</p></div>
     <div class="fld"><label for="f-end">結束日（選填）</label>
@@ -3126,9 +3188,9 @@ function openEventForm(existing, presetDate){
   };
   const body = `
     <div id="f-err" class="err hide"></div>
-    <div class="fld"><label for="f-title">標題 <span style="color:var(--hot)">*</span></label>
+    <div class="fld"><label for="f-title">標題 <span style="color:var(--hot-ink)">*</span></label>
       <input id="f-title" class="inp" value="${esc(e.title)}" placeholder="例：科部演講" maxlength="120"></div>
-    <div class="fld"><label>日期 <span style="color:var(--hot)">*</span></label>
+    <div class="fld"><label>日期 <span style="color:var(--hot-ink)">*</span></label>
       ${datePickerHTML()}</div>
     <div class="fld" id="f-edate-fld"><label for="f-edate">結束日期（選填）</label>
       <input id="f-edate" class="inp" type="date" value="${esc(e.end_date&&e.end_date>e.date?e.end_date:'')}">
