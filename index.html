@@ -57,8 +57,8 @@
   --accent:#2A7574;      --accent-ink:#1E5E5D;
   --accent-soft:#DCEBE8; --accent-line:#A9CFCC; --on-accent:#FDFCF7;
   /* 綠＝完成，跟「可互動」分開，勾掉的東西一眼看得出來 */
-  --done:#38764A;        --done-ink:#2F6B41;
-  --done-soft:#E2F1DE;   --done-line:#B7DCB0;   --on-done:#FDFCF7;
+  --done:#A7DBA0;        --done-ink:#2F6B41;
+  --done-soft:#E2F1DE;   --done-line:#B7DCB0;   --on-done:#133E50;
   /* 橘＝重大與今天；螢光筆也用它 */
   --hot:#F4A14F;         --hot-ink:#8A4A12;
   --hot-mark:#B9660F;    /* --hot 當底色很好，當字或圖示都過不了對比，圖示改用這個 */
@@ -95,7 +95,7 @@
     --accent:#5BA7A6;      --accent-ink:#8FCBC9;
     --accent-soft:#12333B; --accent-line:#2C5F63; --on-accent:#0A1D26;
     --done:#A7DBA0;        --done-ink:#B9E3B3;
-    --done-soft:#14301F;   --done-line:#2E5A34;   --on-done:#0F2A18;
+    --done-soft:#14301F;   --done-line:#2E5A34;   --on-done:#133E50;
     --hot:#F4A14F;         --hot-ink:#F6B978;
   --hot-mark:#F4A14F;    /* 深色底上橘色本來就夠亮，不必再壓 */
     --hot-soft:#33220F;    --hot-line:#5A3C18;    --on-hot:#2A1704;
@@ -129,7 +129,7 @@
   --accent:#5BA7A6;      --accent-ink:#8FCBC9;
   --accent-soft:#12333B; --accent-line:#2C5F63; --on-accent:#0A1D26;
   --done:#A7DBA0;        --done-ink:#B9E3B3;
-  --done-soft:#14301F;   --done-line:#2E5A34;   --on-done:#0F2A18;
+  --done-soft:#14301F;   --done-line:#2E5A34;   --on-done:#133E50;
   --hot:#F4A14F;         --hot-ink:#F6B978;
   --hot-mark:#F4A14F;    /* 深色底上橘色本來就夠亮，不必再壓 */
   --hot-soft:#33220F;    --hot-line:#5A3C18;    --on-hot:#2A1704;
@@ -588,8 +588,10 @@ span.star svg{width:100%;height:100%;display:block}
 .ck{width:23px;height:23px;border-radius:7px;border:1.8px solid var(--line);background:var(--card);
   flex:none;display:grid;place-items:center;margin-top:1px;
   transition:background var(--d-2) var(--e-out),border-color var(--d-2)}
-.ck:hover{border-color:var(--done)}
-.ck.on{background:var(--done);border-color:var(--done)}
+.ck:hover{border-color:var(--done-ink)}
+/* 填色用色票的淺綠，但淺綠在近白卡片上輪廓會消失，
+   外框留深一階的綠，方塊才看得出是「已填」而不是「有底色的空框」 */
+.ck.on{background:var(--done);border-color:var(--done-ink)}
 .ck svg{width:13px;height:13px;color:var(--on-done);opacity:0}
 .ck.on svg{opacity:1}
 .dmain{flex:1;min-width:0;text-align:left}
@@ -1142,7 +1144,9 @@ const UNIT_LABEL = Object.fromEntries(UNITS.map(u=>[u.k,u.label]));
 const WD = ['日','一','二','三','四','五','六'];
 /* 類別色一律取自色票的四個色相家族（橄欖／赭黃／棕／酒紅），每族各一深一淺。
    色票只有四個色相，所以深淺必須也能分辨——liftForDark() 因此改成保留亮度差。 */
-const PALETTE = ['#636845','#B78534','#B06F4F','#BF4A50','#3B3D1F','#583B19','#3F281C','#481417'];
+/* 類別色：沿著色票的色相走一圈（藍綠→琥珀→綠→靛藍→橄欖→赭→灰藍→苔綠）。
+   亮度都壓在能當圓點的範圍（淺底 ≥3:1），深色再交給 liftForDark() 提亮。 */
+const PALETTE = ['#2A7574','#C87A22','#4C8C5B','#1F5F7E','#8A9150','#A9502C','#5E7F94','#7A8B3E'];
 /* 舊色票留在資料庫裡的類別色，照 index 換成現在這組。類別色沒有自訂介面、
    一律由 PALETTE 指派，所以只要對得上舊值就能安全換掉。 */
 const LEGACY_PALETTES = [
