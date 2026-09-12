@@ -85,28 +85,29 @@
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
     color-scheme:dark;
-    /* 深色是把棉紙換成深靛藍的紙，不是把淺色反過來 */
-    --bg:#0A1D26;          --bg2:#16333F;
-    --card:#0F2833;        --card2:#15323E;
-    --line:#2A4E5C;        --line-soft:#1B3C49;
-    --ink:#EAF1F0;         --ink2:#A9C4C6;       --muted:#83A3A9;
-    --tick:#1E3B47;
+    /* 深色的底一律中性黑灰，不帶色相——色票的藍綠、綠、橘全部靠自己發聲，
+     底色再染同一個色系只會把它們吃掉 */
+    --bg:#111214;          --bg2:#212327;
+    --card:#181A1D;        --card2:#1E2124;
+    --line:#34383D;        --line-soft:#26292D;
+    --ink:#ECEEF1;         --ink2:#B6BBC1;       --muted:#8A9097;
+    --tick:#2A2E33;
 
     --accent:#5BA7A6;      --accent-ink:#8FCBC9;
-    --accent-soft:#12333B; --accent-line:#2C5F63; --on-accent:#0A1D26;
+    --accent-soft:#16292C; --accent-line:#2E5457; --on-accent:#111214;
     --done:#A7DBA0;        --done-ink:#B9E3B3;
-    --done-soft:#14301F;   --done-line:#2E5A34;   --on-done:#133E50;
+    --done-soft:#18251A;   --done-line:#2F4A33;   --on-done:#133E50;
     --hot:#F4A14F;         --hot-ink:#F6B978;
   --hot-mark:#F4A14F;    /* 深色底上橘色本來就夠亮，不必再壓 */
-    --hot-soft:#33220F;    --hot-line:#5A3C18;    --on-hot:#2A1704;
-    --danger:#E97552;      --danger-soft:#33190F; --danger-line:#5A2E1C;
+    --hot-soft:#2B2118;    --hot-line:#4C3A25;    --on-hot:#2A1704;
+    --danger:#E97552;      --danger-soft:#2E1B15; --danger-line:#533024;
 
     --imp-ring:rgba(244,161,79,.5);
     --imp-ring-hi:rgba(244,161,79,.78);
-    --bg-blur:rgba(10,29,38,.88);
-    --nav-bg:rgba(15,40,51,.94);
+    --bg-blur:rgba(17,18,20,.88);
+    --nav-bg:rgba(24,26,29,.94);
     --scrim:rgba(0,0,0,.62);
-    --toast-bg:#EAF1F0;    --toast-ink:#0F2833;
+    --toast-bg:#ECEEF1;    --toast-ink:#181A1D;
     --toast-bad:#E97552;   --toast-bad-ink:#2A0F06;
 
     --sh-1:0 1px 2px rgba(0,0,0,.34);
@@ -119,28 +120,29 @@
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
-  /* 深色是把棉紙換成深靛藍的紙，不是把淺色反過來 */
-  --bg:#0A1D26;          --bg2:#16333F;
-  --card:#0F2833;        --card2:#15323E;
-  --line:#2A4E5C;        --line-soft:#1B3C49;
-  --ink:#EAF1F0;         --ink2:#A9C4C6;       --muted:#83A3A9;
-  --tick:#1E3B47;
+  /* 深色的底一律中性黑灰，不帶色相——色票的藍綠、綠、橘全部靠自己發聲，
+     底色再染同一個色系只會把它們吃掉 */
+  --bg:#111214;          --bg2:#212327;
+  --card:#181A1D;        --card2:#1E2124;
+  --line:#34383D;        --line-soft:#26292D;
+  --ink:#ECEEF1;         --ink2:#B6BBC1;       --muted:#8A9097;
+  --tick:#2A2E33;
 
   --accent:#5BA7A6;      --accent-ink:#8FCBC9;
-  --accent-soft:#12333B; --accent-line:#2C5F63; --on-accent:#0A1D26;
+  --accent-soft:#16292C; --accent-line:#2E5457; --on-accent:#111214;
   --done:#A7DBA0;        --done-ink:#B9E3B3;
-  --done-soft:#14301F;   --done-line:#2E5A34;   --on-done:#133E50;
+  --done-soft:#18251A;   --done-line:#2F4A33;   --on-done:#133E50;
   --hot:#F4A14F;         --hot-ink:#F6B978;
   --hot-mark:#F4A14F;    /* 深色底上橘色本來就夠亮，不必再壓 */
-  --hot-soft:#33220F;    --hot-line:#5A3C18;    --on-hot:#2A1704;
-  --danger:#E97552;      --danger-soft:#33190F; --danger-line:#5A2E1C;
+  --hot-soft:#2B2118;    --hot-line:#4C3A25;    --on-hot:#2A1704;
+  --danger:#E97552;      --danger-soft:#2E1B15; --danger-line:#533024;
 
   --imp-ring:rgba(244,161,79,.5);
   --imp-ring-hi:rgba(244,161,79,.78);
-  --bg-blur:rgba(10,29,38,.88);
-  --nav-bg:rgba(15,40,51,.94);
+  --bg-blur:rgba(17,18,20,.88);
+  --nav-bg:rgba(24,26,29,.94);
   --scrim:rgba(0,0,0,.62);
-  --toast-bg:#EAF1F0;    --toast-ink:#0F2833;
+  --toast-bg:#ECEEF1;    --toast-ink:#181A1D;
   --toast-bad:#E97552;   --toast-bad-ink:#2A0F06;
 
   --sh-1:0 1px 2px rgba(0,0,0,.34);
@@ -1264,7 +1266,7 @@ function catColor(name){
    三段：跟隨系統／淺色／深色。深色不是把顏色反過來，是另一組暖墨色票；
    類別色也會跟著換算，所以切換後要重畫一次。 */
 const THEME_KEY = 'todo.theme';
-const THEME_BG  = { light:'#F2EFE3', dark:'#16100A' };
+const THEME_BG  = { light:'#F8F7F2', dark:'#111214' };
 const prefersDark = () => window.matchMedia('(prefers-color-scheme:dark)').matches;
 function themeMode(){
   try{ const v = localStorage.getItem(THEME_KEY); if(v==='light'||v==='dark') return v; }catch(e){}
