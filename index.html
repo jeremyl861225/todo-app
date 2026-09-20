@@ -362,7 +362,7 @@ span.star svg{width:100%;height:100%;display:block}
 .item.task .bd{padding:0;text-align:left}
 .item.task.done{background:var(--bg);box-shadow:none}
 .item.task.done:hover{box-shadow:var(--sh-1)}
-.item.task.done .ti{color:var(--ink2);
+.item.task.done .ti{color:var(--muted);
   text-decoration:line-through;text-decoration-thickness:1px;text-underline-offset:.2em}
 .item .nextsub{display:flex;align-items:center;gap:var(--s-2);margin-top:var(--s-1);min-width:0;
   color:var(--muted);font-size:var(--t-sm);line-height:1.5}
@@ -527,14 +527,20 @@ span.star svg{width:100%;height:100%;display:block}
 .cchip{font-size:var(--t-2xs);line-height:1.4;padding:2px 6px;border-radius:5px;background:var(--bg2);
   color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   box-shadow:inset 2px 0 0 var(--c)}
-/* 已完成的晶片改成只留描邊，退場感一樣但字不會掉到讀不到 */
-.cchip.done{background:transparent;color:var(--ink2);
-  box-shadow:inset 0 0 0 1px var(--line);text-decoration:line-through;text-decoration-thickness:1px}
+/* 已完成：底色退到 --bg（比卡片更靠後）、字降一階到 --muted、外框收成最淡的線。
+   原本字色與未完成同樣是 --ink2，深色主題下兩者只差一條刪除線，分不出來。
+   --muted 在深淺兩邊對卡片都還有 5.8:1，讀得到但明顯退場。 */
+.cchip.done{background:var(--bg);color:var(--muted);font-weight:400;
+  box-shadow:inset 0 0 0 1px var(--line-soft);
+  text-decoration:line-through;text-decoration-thickness:1px;
+  text-decoration-color:var(--muted)}
 /* 單一行程：淡染色的圓角膠囊；重複排程：灰底＋左側色條。
    色相由底色與外框帶，字一律用 ink，才不會因為使用者挑了淺色類別而讀不到。 */
 .cchip.evt{background:var(--c-soft);color:var(--ink);font-weight:600;
   box-shadow:inset 0 0 0 1px var(--c-line);border-radius:999px;padding:2px 8px}
-.cchip.evt.done{background:transparent;color:var(--ink2);box-shadow:inset 0 0 0 1px var(--c-line)}
+/* 行程完成後連類別色的外框也收掉——留著會讓它跟未完成的膠囊一樣搶眼 */
+.cchip.evt.done{background:var(--bg);color:var(--muted);font-weight:400;
+  box-shadow:inset 0 0 0 1px var(--line-soft)}
 .cchip.evt.st{border-radius:999px 3px 3px 999px}
 .cchip.evt.mid{border-radius:3px}
 .cchip.evt.en{border-radius:3px 999px 999px 3px}
@@ -582,11 +588,11 @@ span.star svg{width:100%;height:100%;display:block}
 .drow.evt:hover{background:var(--c-soft);filter:brightness(1.03)}
 .tag.ev{background:var(--c-soft);color:var(--ink);font-weight:600;box-shadow:inset 0 0 0 1px var(--c-line)}
 .drow.done{background:var(--bg)}
-.drow.done .dt{color:var(--ink2);
+.drow.done .dt{color:var(--muted);
   text-decoration:line-through;text-decoration-thickness:1px;text-underline-offset:.2em}
 /* 行程列本來就有自己的底色，完成後改用中性底，才看得出已經處理過 */
 .drow.evt.done{background:var(--bg);border-color:var(--line-soft)}
-.drow.evt.done .tag.ev{background:var(--bg2);color:var(--ink2);box-shadow:none}
+.drow.evt.done .tag.ev{background:var(--bg2);color:var(--muted);box-shadow:none;font-weight:400}
 .ck{width:23px;height:23px;border-radius:7px;border:1.8px solid var(--line);background:var(--card);
   flex:none;display:grid;place-items:center;margin-top:1px;
   transition:background var(--d-2) var(--e-out),border-color var(--d-2)}
