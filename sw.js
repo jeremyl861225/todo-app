@@ -54,7 +54,24 @@ self.addEventListener('fetch', e=>{
   const url = new URL(req.url);
   if(url.origin !== self.location.origin) return;      // Supabase 等外部一律走網路
   if(!url.pathname.startsWith(scopePath)) return;      // 不碰同網域其他 App
-  if(url.search) return;                               // 帶查詢字串的不快取
+  // 帶查詢字串的資源不進快取。但桌面小工具的深連結是 ./?d=2026-09-26，
+  // 那是一次導覽、內容就是 index.html——直接 return 的話離線點小工具會開不起來，
+  // 所以導覽改成「先走網路、失敗再拿外殼」。
+  if(url.search){
+    if(req.mode !== 'navigate') return;
+    e.respondWith((async ()=>{
+      try{
+        const res = await fetch(req);
+        if(res) return res;
+      }catch(err){ /* 離線，往下拿外殼 */ }
+      const cache = await caches.open(CACHE);
+      return (await cache.match('./index.html')) || (await cache.match('./')) ||
+        new Response('離線，且這個資源沒有快取。', {
+          status: 503, headers: {'Content-Type':'text/plain; charset=utf-8'}
+        });
+    })());
+    return;
+  }
 
   // stale-while-revalidate：先給快取，背景更新，下次開就是新版
   e.respondWith((async ()=>{

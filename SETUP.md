@@ -30,12 +30,17 @@ App 啟動時會偵測欄位，缺哪一份就在頂端指名顯示）：
 | [`2026-08-tasks.sql`](migrations/2026-08-tasks.sql) | 近期任務（`tasks` 資料表、子任務、完成日期） | ✅ 已執行 2026-08-23 |
 | [`2026-08-move.sql`](migrations/2026-08-move.sql) | 單次挪動排程日期 | ✅ 已執行 |
 | [`2026-08-subitems.sql`](migrations/2026-08-subitems.sql) | 重複排程與單一行程的子事項（`sub_done` 資料表，逐日勾選） | ✅ 已執行 2026-08-31 |
+| [`2026-09-widget.sql`](migrations/2026-09-widget.sql) | iPhone 桌面小工具的唯讀快照（`widget_feeds` 資料表） | ✅ 已執行 2026-09-20 |
 
 `tasks` 建好後已用真實 RLS 條件驗過（交易內測試、已 rollback 不留資料）：
 本人可新增／讀取／更新，另一個帳號讀 0 筆、改 0 筆、刪 0 筆，未登入讀 0 筆。
 
 `sub_done` 同樣驗過（同一套方法）：本人可新增並讀到 1 筆，另一個帳號讀 0 筆、
 改 0 筆、刪 0 筆，未登入讀 0 筆；測試資料已隨交易 rollback，資料表為空。
+
+**Edge Function `widget` 已部署**（`verify_jwt` 關閉，改用網址上的 token 驗證）。
+自己重建時用 `supabase functions deploy widget --no-verify-jwt`，原始碼在
+[`functions/widget/index.ts`](functions/widget/index.ts)。
 
 > ⚠️ Supabase 的 **Confirm email 仍是開啟的**，所以新註冊的帳號要去信箱點確認信才能登入。
 > 想省掉這一步，到 Supabase → Authentication → Sign In / Providers → Email →
@@ -126,6 +131,57 @@ const CONFIG = {
 
 **Android（Chrome）**
 1. 開網址 → 右上角「⋮」→ **加到主畫面 / 安裝應用程式**。
+
+---
+
+## 步驟七：iPhone 桌面小工具與鎖定畫面桌布
+
+App 裡右上角「⋯」→ **桌面小工具** 會帶完整步驟，這裡只說它背後在做什麼、
+以及為什麼分成兩種做法。
+
+### 為什麼鎖定畫面要用「桌布」而不是小工具
+
+iPhone 鎖定畫面的小工具區就是時鐘底下那一小條，**最多四個小的或兩個中的**，
+放不下一整週加卡片（iOS 27 也沒有放寬）。所以：
+
+| 位置 | 做法 | 點得動嗎 |
+|---|---|---|
+| **桌面** | Scriptable 大型小工具 | 點某一天 → 開 App 跳到那天 |
+| **鎖定畫面** | 把同一個版面畫成**桌布圖片**，捷徑定時換上 | ❌ 只能看 |
+| **鎖定畫面小工具條** | 長條小工具：今天幾件＋最近兩件 | 點 → 開 App |
+
+### 資料怎麼過去
+
+小工具跑在 Scriptable 裡，沒辦法登入，所以走的是「App 先算好、推一份唯讀快照」：
+
+1. App 每次變更（`saveCache()`）後把**今天前 7 天到後 35 天、已經展開好的事項**
+   寫進 `widget_feeds.payload`，去彈跳 2 秒，連續編輯只送最後一次。
+2. 小工具帶網址上的 token 打 Edge Function `widget`，換回那份 payload。
+3. 重複排程怎麼展開（`occursOn` 那一整套）**只有 App 有**。伺服器不重寫一份，
+   所以不會有兩套規則各自漂移——資料也只有 App 會改，快照永遠等於最後一次編輯的結果。
+
+token 是一把**唯讀鑰匙**，拿到的人看得到事項標題。設定畫面可以隨時重新產生，
+舊的立刻失效（桌面的小工具要重貼一次）。
+
+### 檔案
+
+| 檔案 | 用途 |
+|---|---|
+| [`widget/todo-widget.js`](widget/todo-widget.js) | 桌面小工具（大／中／小／鎖定畫面長條） |
+| [`widget/todo-wallpaper.js`](widget/todo-wallpaper.js) | 鎖定畫面桌布產生器 |
+| [`widget/preview.html`](widget/preview.html) | 在電腦上用真實尺寸看版面（可貼小工具網址看真資料） |
+| [`widget/test-widget.mjs`](widget/test-widget.mjs) | 用假的 Scriptable API 跑一次兩支腳本 |
+| [`functions/widget/index.ts`](functions/widget/index.ts) | Edge Function 原始碼 |
+
+貼進 Scriptable 的是一段**四行的載入器**，真正的程式每次從 GitHub Pages 抓。
+這樣改版面不用在手機上重貼幾百行——但也表示小工具更新時要有網路
+（抓不到會退回上一次的快取，不會變空白）。
+
+改過 `widget/` 底下任何一支腳本，收尾請跑：
+
+```bash
+node widget/test-widget.mjs
+```
 
 ---
 

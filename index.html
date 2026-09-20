@@ -778,6 +778,16 @@ select.inp{appearance:none;background-image:var(--sel-arrow);
 .addlink svg{width:13px;height:13px;flex:none}
 .addlink:hover{text-decoration:underline}
 .hint{font-size:var(--t-xs);color:var(--muted);margin:var(--s-2) 0 0;line-height:1.6}
+
+/* ---------- 桌面小工具設定 ---------- */
+.wf-steps{margin:0;padding:0 0 0 1.25em;font-size:var(--t-sm);color:var(--ink2);line-height:1.75}
+.wf-steps li{margin:0 0 5px}
+.wf-steps li:last-child{margin-bottom:0}
+.wf-steps b{color:var(--ink);font-weight:650}
+/* 貼給 Scriptable 的程式碼：等寬、不換行、可橫向捲，長按整段複製才不會斷行 */
+.wf-code{font-family:var(--mono);font-size:var(--t-2xs);line-height:1.55;
+  white-space:pre;overflow-x:auto;resize:vertical;min-height:86px;
+  background:var(--card2);color:var(--ink2)}
 .err{font-size:var(--t-sm);color:var(--danger);background:var(--danger-soft);border:1px solid var(--danger-line);
   border-radius:var(--r-sm);padding:10px 12px;margin:0 0 var(--s-4);line-height:1.6}
 
@@ -1249,17 +1259,17 @@ function liftForDark(hex){
   return '#' + hx(ch(hu+1/3)) + hx(ch(hu)) + hx(ch(hu-1/3));
 }
 const isDarkMode = () => document.documentElement.classList.contains('is-dark');
+/** 類別的原色，不受深淺主題影響。推給桌面小工具的快照要用這個——
+    小工具有自己的明暗，顏色該由它那邊換算，不能把這裡的深色版寫死進去。 */
+function catColorBase(name){
+  if(!name) return '#8F8368';
+  const c = state.categories.find(x=>x.name===name);
+  if(c && c.color) return c.color;
+  let h=0; for(const ch of name) h=(h*31+ch.charCodeAt(0))>>>0;
+  return PALETTE[h%PALETTE.length];
+}
 function catColor(name){
-  let base;
-  if(!name) base = '#8F8368';
-  else {
-    const c = state.categories.find(x=>x.name===name);
-    if(c && c.color) base = c.color;
-    else {
-      let h=0; for(const ch of name) h=(h*31+ch.charCodeAt(0))>>>0;
-      base = PALETTE[h%PALETTE.length];
-    }
-  }
+  const base = catColorBase(name);
   return isDarkMode() ? liftForDark(base) : base;
 }
 /* ---------- 主題 ----------
@@ -1589,6 +1599,7 @@ function cmpDone(a, b){
    狀態 + 儲存
    ============================================================ */
 let sb = null;
+let sbUrl = null;       // 建立 client 時記下來，桌面小工具的網址要用
 let session = null;
 const state = {
   schedules:[], events:[], completions:[], categories:[], tasks:[], subDone:[],
@@ -1615,6 +1626,7 @@ function saveCache(){
       tasks: state.tasks, subDone: state.subDone
     }));
   }catch(e){ /* quota */ }
+  wfTouch();          // 本機一有變更就排一次小工具快照推送（沒啟用時是空操作）
 }
 function loadCache(){
   try{
@@ -3381,6 +3393,7 @@ function openMenu(){
     </div>
     <div class="sep"></div>
     <button data-a="cats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0l-7-7A2 2 0 0 1 3 12.2V5a2 2 0 0 1 2-2h7.2a2 2 0 0 1 1.4.6l7 7a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor"/></svg>管理類別</button>
+    <button data-a="widget"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg>桌面小工具</button>
     <button data-a="sync"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.5M4 13a8 8 0 0 0 14.3 4.5"/><path d="M20 4v4h-4M4 20v-4h4"/></svg>立即重新同步</button>
     <button data-a="import"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>匯入 JSON</button>
     <button data-a="export"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M8 7l4-4 4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>匯出備份 JSON</button>
@@ -3394,6 +3407,7 @@ function openMenu(){
     $$('#thm button', menuEl).forEach(x=>x.classList.toggle('on', x===b));
   });
   menuEl.querySelector('[data-a=cats]').onclick   = ()=>{ closeMenu(); openCatManager(); };
+  menuEl.querySelector('[data-a=widget]').onclick = ()=>{ closeMenu(); openWidgetPanel(); };
   menuEl.querySelector('[data-a=sync]').onclick   = async ()=>{ closeMenu(); await flushQueue(); await pullAll(); toast('已重新同步'); };
   menuEl.querySelector('[data-a=import]').onclick = ()=>{ closeMenu(); openImportMenu(); };
   menuEl.querySelector('[data-a=export]').onclick = ()=>{ closeMenu(); exportJSON(); };
@@ -3680,6 +3694,298 @@ function exportJSON(){
 }
 
 /* ============================================================
+   桌面小工具（Scriptable）
+   ------------------------------------------------------------
+   重複排程的展開規則（occursOn／schedShowsOn／moves 那一整套）只有這支
+   App 有。與其在伺服器再寫一份，不如由 App 把「已經展開好的結果」寫成
+   快照送上去：資料只有這支 App 會改，所以快照永遠等於最後一次編輯當下
+   的正確答案，不會有兩套邏輯各自漂移。小工具那邊只要讀，不必懂規則。
+
+   Supabase 那邊是 widget_feeds 一人一列（token 當鑰匙），
+   小工具打 Edge Function `widget` 帶 token 換那一列的 payload。
+   ============================================================ */
+const WF_BACK = 7;         // 快照往回涵蓋幾天（小工具能翻到上一週）
+const WF_AHEAD = 35;       // 往前涵蓋幾天
+const WF_DEBOUNCE = 2000;  // 連續編輯時，最後一次過多久才推
+
+let wfRow = null;          // widget_feeds 的那一列 {id, token}；null = 尚未啟用
+let wfState = 'idle';      // idle | ready | absent | unsupported
+let wfTimer = null, wfSending = false, wfAgain = false;
+
+/** 32 個字元的 base64url 亂數，對得上 Edge Function 的 /^[A-Za-z0-9_-]{24,128}$/ */
+function wfMakeToken(){
+  const a = new Uint8Array(24);
+  crypto.getRandomValues(a);
+  return btoa(String.fromCharCode(...a)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+const wfFeedUrl = () => (wfRow && sbUrl) ? `${sbUrl}/functions/v1/widget?t=${wfRow.token}` : '';
+
+async function wfLoad(){
+  if(!sb || !session || !sbUrl){ wfState = 'unsupported'; wfRow = null; return; }
+  try{
+    const r = await sb.from('widget_feeds').select('id,token').eq('user_id', session.user.id).maybeSingle();
+    if(r.error){
+      // 資料表還沒建（自架但沒跑 migration）就當作沒有這個功能，別擋住 App
+      wfState = /does not exist|schema|relation/i.test(String(r.error.message||'')) ? 'unsupported' : 'idle';
+      wfRow = null; return;
+    }
+    wfRow = r.data || null;
+    wfState = wfRow ? 'ready' : 'absent';
+  }catch(e){ wfState = 'idle'; wfRow = null; }
+}
+
+async function wfEnable(){
+  const r = await sb.from('widget_feeds')
+    .upsert({ user_id: session.user.id, token: wfMakeToken(), payload: wfBuild(),
+              updated_at: new Date().toISOString() }, { onConflict:'user_id' })
+    .select('id,token').single();
+  if(r.error) throw r.error;
+  wfRow = r.data; wfState = 'ready';
+  return wfRow;
+}
+async function wfDisable(){
+  if(!wfRow) return;
+  const { error } = await sb.from('widget_feeds').delete().eq('id', wfRow.id);
+  if(error) throw error;
+  wfRow = null; wfState = 'absent';
+}
+
+/** 快照內容。日期一律用本機日期字串，小工具不做時區換算。 */
+function wfBuild(){
+  const today = todayStr();
+  const days = {};
+  for(let i = -WF_BACK; i <= WF_AHEAD; i++){
+    const ds = addDays(today, i);
+    const list = [];
+
+    for(const it of itemsOn(ds)){
+      const r = it.row;
+      const sp = subProgress(r, ds);
+      const o = {
+        k: it.kind === 'event' ? 'e' : 's',
+        i: r.id,
+        t: String(r.title||''),
+        w: String(r.time_text||'').trim(),
+        c: String(r.category||''),
+        p: catColorBase(r.category),
+        d: isDone(r.id, ds)
+      };
+      if(r.important) o.m = 1;
+      if(sp.m) o.s = [sp.n, sp.m];
+      if(it.kind === 'event' && it.span > 1){ o.n = it.span; o.x = it.dayIndex; }
+      list.push(o);
+    }
+
+    // 近期任務照截止日落在當天。任務不進月曆是刻意的，但小工具是「今天要做什麼」，
+    // 少了任務就不完整，所以這裡收進來，用 k:'t' 讓小工具畫得不一樣。
+    for(const t of state.tasks){
+      if(t.done || t.due_date !== ds) continue;
+      const pg = taskProgress(t);
+      const o = { k:'t', i:t.id, t:String(t.title||''), w:'', c:String(t.category||''),
+                  p: catColorBase(t.category), d:false };
+      if(t.important) o.m = 1;
+      if(pg.m) o.s = [pg.n, pg.m];
+      list.push(o);
+    }
+
+    if(list.length) days[ds] = list;
+  }
+
+  // 逾期未完成的任務不屬於任何一天，另外列，小工具用紅字提醒
+  const late = state.tasks
+    .filter(t => !t.done && t.due_date && t.due_date < today)
+    .sort((a,b)=> String(a.due_date).localeCompare(String(b.due_date)))
+    .slice(0, 8)
+    .map(t => ({ k:'t', i:t.id, t:String(t.title||''), c:String(t.category||''),
+                 p: catColorBase(t.category), due:t.due_date, m: t.important ? 1 : 0 }));
+
+  return { v:1, gen:new Date().toISOString(), today,
+           from: addDays(today, -WF_BACK), to: addDays(today, WF_AHEAD),
+           app: appUrl(), days, late };
+}
+
+/** 有變更 → 排一次推送（連續編輯只送最後一次） */
+function wfTouch(){
+  if(wfState !== 'ready' || !wfRow) return;
+  clearTimeout(wfTimer);
+  wfTimer = setTimeout(wfPush, WF_DEBOUNCE);
+}
+async function wfPush(){
+  if(wfState !== 'ready' || !wfRow) return;
+  clearTimeout(wfTimer); wfTimer = null;
+  if(wfSending){ wfAgain = true; return; }   // 正在送就記一筆，送完再補一次
+  wfSending = true;
+  try{
+    await sb.from('widget_feeds')
+      .update({ payload: wfBuild(), updated_at: new Date().toISOString() })
+      .eq('id', wfRow.id);
+  }catch(e){
+    // 推不上去不影響 App 本身；下次編輯或下次開啟 App 都會重推
+    console.warn('widget feed push failed', e);
+  }
+  wfSending = false;
+  if(wfAgain){ wfAgain = false; wfPush(); }
+}
+
+/* ---------- 設定畫面 ---------- */
+function openWidgetPanel(){
+  const BASE = 'https://jeremyl861225.github.io/todo-app/widget/';
+
+  /* 貼進 Scriptable 的是一段「載入器」而不是整支程式：
+     版面之後要調，重貼四行比重貼四百行容易得多。 */
+  const snippet = (file, title) => [
+    `// ${title}`,
+    `const FEED="${wfFeedUrl()}";`,
+    `const C=await new Request("${BASE}${file}?v="+Math.floor(Date.now()/36e5)).loadString();`,
+    'await new Function("FEED",C+"\\nreturn main(FEED);")(FEED);'
+  ].join('\n');
+
+  const off = `
+    <p class="hint" style="margin:0 0 12px">
+      在 iPhone 桌面放一個小工具，顯示本週七天與當天的事項，點某一天會開啟這個 App 跳到那天；
+      也可以把同一個版面畫成鎖定畫面的桌布。兩個都需要 App Store 上免費的 <b>Scriptable</b>。
+    </p>
+    <button class="btn pri wide" data-on>建立小工具網址</button>`;
+
+  // 試用模式沒有雲端，自架但沒跑 migration 也沒有這張表——兩種都不必給按鈕
+  const nope = `<p class="hint" style="margin:0">
+      ${session?.user?.id === 'demo-user'
+        ? '試用模式沒有雲端資料，小工具讀不到東西。請先註冊登入再回來設定。'
+        : '雲端還沒有 <code>widget_feeds</code> 這張表。請到 Supabase → SQL Editor 執行 <code>migrations/2026-09-widget.sql</code>，再重新整理這個頁面。'}
+    </p>`;
+
+  const on = () => `
+    <div class="fld">
+      <label for="wf-url">小工具網址</label>
+      <input id="wf-url" class="inp" readonly value="${esc(wfFeedUrl())}"
+             autocapitalize="off" autocorrect="off" spellcheck="false">
+    </div>
+    <p class="hint" style="margin:-4px 0 14px;color:var(--danger)">
+      這個網址等於一把唯讀鑰匙，拿到的人看得到你的事項標題。別貼到公開的地方；
+      不小心外流就按下面的「重新產生網址」，舊的立刻失效。
+    </p>
+
+    <div class="fld">
+      <label>一、桌面小工具（看得到也點得動）</label>
+      <ol class="wf-steps">
+        <li>App Store 安裝 <b>Scriptable</b>（免費）。</li>
+        <li>打開 Scriptable，右上角 <b>＋</b> 建新指令碼，把下面這段整個貼上。</li>
+        <li>左上角改名成 <b>待辦事項</b>，回到桌面。</li>
+        <li>長按桌面 → 左上 <b>＋</b> → 找 <b>Scriptable</b> → 選<b>大型</b> →
+            加入後長按它 → <b>編輯小工具</b> → Script 選「待辦事項」、
+            <b>When Interacting</b> 選 <b>Run Script</b>。</li>
+      </ol>
+      <textarea id="wf-code" class="inp wf-code" readonly rows="4"
+                autocapitalize="off" autocorrect="off" spellcheck="false">${esc(snippet('todo-widget.js','待辦事項 桌面小工具'))}</textarea>
+      <div class="linkrow" style="margin-top:6px">
+        <button class="btn" data-copy="wf-code">複製這段</button>
+      </div>
+    </div>
+
+    <div class="fld">
+      <label>二、鎖定畫面桌布（只能看，不能點）</label>
+      <p class="hint" style="margin:0 0 8px">
+        鎖定畫面的小工具區只有時鐘下面那一小條，塞不下整週。
+        要在鎖定畫面看到週曆，得把它畫進<b>桌布圖片</b>裡，再讓捷徑定時換上。
+      </p>
+      <ol class="wf-steps">
+        <li>Scriptable 再建一支指令碼，貼下面這段，命名 <b>待辦桌布</b>。
+            先按 ▶ 跑一次會跳出預覽，確認版面沒問題。</li>
+        <li>（選填）想用自己的照片當底：把圖命名成 <code>todo-wallpaper-bg.jpg</code>，
+            放進「檔案」App → iCloud Drive → Scriptable。沒放就是素色底。</li>
+        <li>捷徑 App → 新增捷徑 → 加入 <b>執行指令碼</b>（選「待辦桌布」）→
+            再加 <b>設定桌布</b>，來源選上一步的結果，套用到<b>鎖定畫面</b>。命名 <b>更新桌布</b>。</li>
+        <li>捷徑 → <b>自動化</b> → 新增 → <b>特定時間</b>（例如每天 06:00）→
+            執行「更新桌布」→ 關掉「執行前先詢問」。</li>
+      </ol>
+      <textarea id="wf-code2" class="inp wf-code" readonly rows="4"
+                autocapitalize="off" autocorrect="off" spellcheck="false">${esc(snippet('todo-wallpaper.js','待辦事項 鎖定畫面桌布'))}</textarea>
+      <div class="linkrow" style="margin-top:6px">
+        <button class="btn" data-copy="wf-code2">複製這段</button>
+      </div>
+    </div>
+
+    <div class="linkrow" style="margin-top:2px">
+      <button class="btn" data-push>立即更新</button>
+      <span style="flex:1"></span>
+      <button class="btn" data-regen>重新產生網址</button>
+      <button class="btn dg" data-off>停用</button>
+    </div>
+    <p class="hint">
+      小工具的畫面由 iOS 決定多久更新一次（通常十幾分鐘到一小時）。
+      你在這裡改了什麼，會即時存進雲端，小工具下次更新就會看到。
+    </p>`;
+
+  const m = modal({
+    title:'桌面小工具',
+    body:`<div id="wf-box">${wfState === 'ready' ? on() : wfState === 'unsupported' ? nope : off}</div>`,
+    footer:`<span class="sp"></span><button class="btn pri" data-done>完成</button>`
+  });
+  const R = m.ov;
+  $('[data-done]', R).onclick = m.close;
+
+  const wire = ()=>{
+    const q = sel => $(sel, R);
+    const redraw = ()=>{
+      $('#wf-box', R).innerHTML = wfState === 'ready' ? on() : wfState === 'unsupported' ? nope : off;
+      wire();
+    };
+
+    const bOn = q('[data-on]');
+    if(bOn) bOn.onclick = async ()=>{
+      bOn.disabled = true; bOn.textContent = '建立中…';
+      try{ await wfEnable(); toast('小工具網址已建立'); redraw(); }
+      catch(e){
+        bOn.disabled = false; bOn.textContent = '建立小工具網址';
+        toast(/does not exist|relation/i.test(String(e?.message||'')) 
+          ? '資料表尚未建立，請先在 Supabase 執行 migrations/2026-09-widget.sql' : '建立失敗，請稍後再試', true);
+      }
+    };
+
+    $$('[data-copy]', R).forEach(b => b.onclick = async ()=>{
+      const ta = q('#' + b.dataset.copy);
+      if(!ta) return;
+      try{
+        await navigator.clipboard.writeText(ta.value);
+        toast('已複製，貼到 Scriptable');
+      }catch(e){
+        // iOS 主畫面模式偶爾拿不到剪貼簿權限，退回讓使用者自己長按複製
+        ta.focus(); ta.select();
+        toast('請長按那段文字，選「全選」再複製', true);
+      }
+    });
+
+    const bPush = q('[data-push]');
+    if(bPush) bPush.onclick = async ()=>{
+      bPush.disabled = true;
+      await wfPush();
+      bPush.disabled = false;
+      toast('已送出最新內容');
+    };
+
+    const bRegen = q('[data-regen]');
+    if(bRegen) bRegen.onclick = async ()=>{
+      if(!confirm('舊網址會立刻失效，桌面的小工具要重新貼一次程式碼。要繼續嗎？')) return;
+      try{
+        const { error } = await sb.from('widget_feeds')
+          .update({ token: wfMakeToken(), updated_at:new Date().toISOString() })
+          .eq('id', wfRow.id);
+        if(error) throw error;
+        await wfLoad(); redraw(); toast('已重新產生，請重貼程式碼');
+      }catch(e){ toast('產生失敗，請稍後再試', true); }
+    };
+
+    const bOff = q('[data-off]');
+    if(bOff) bOff.onclick = async ()=>{
+      if(!confirm('停用後小工具會顯示不出內容。要停用嗎？')) return;
+      try{ await wfDisable(); redraw(); toast('已停用'); }
+      catch(e){ toast('停用失敗，請稍後再試', true); }
+    };
+  };
+  wire();
+}
+
+/* ============================================================
    頁面切換 / 總繪製
    ============================================================ */
 const PAGES = ['list','cal','task'];
@@ -3869,6 +4175,23 @@ async function startApp(){
     state.page = PAGES.includes(p) ? p : 'list';
   }catch(e){}
 
+  // 桌面小工具點某一天會帶 ?d=YYYY-MM-DD 進來，直接開到月曆的那一天
+  try{
+    const qd = new URLSearchParams(location.search).get('d');
+    if(isYmd(qd)){
+      const dd = parseYmd(qd);
+      state.selDate = qd;
+      state.calY = dd.getFullYear();
+      state.calM = dd.getMonth();
+      state.page = 'cal';
+      // 網址留著 d 的話，之後重新整理會一直跳回那天，用完就清掉
+      const keep = new URLSearchParams(location.search);
+      keep.delete('d');
+      const qs = keep.toString();
+      history.replaceState(null, '', appUrl() + (qs ? '?' + qs : ''));
+    }
+  }catch(e){}
+
   // 事件
   $$('#nav button').forEach(b=>b.onclick = ()=>setPage(b.dataset.p));
   $('#btn-menu').onclick = e=>{ e.stopPropagation(); openMenu(); };
@@ -3890,8 +4213,12 @@ async function startApp(){
   setPage(state.page);
   if(hadCache) render();
 
+  // debounce 還在等的時候把 App 切走，就當場補送，別讓那次變更留到下次開啟才上去
+  document.addEventListener('visibilitychange', ()=>{ if(document.hidden && wfTimer) wfPush(); });
+
+  await wfLoad();       // 有沒有啟用桌面小工具（沒有的話後面的推送全是空操作）
   await flushQueue();   // 先把離線期間的變更送上去，再拉回伺服器版本
-  await pullAll();
+  await pullAll();      // 拉完會 saveCache → wfTouch，順手把小工具快照更新成今天
   await checkSchema();
 
   // 首次使用：建立預設類別
@@ -3971,6 +4298,7 @@ const DEMO_SESSION = { user:{ id:'demo-user', email:'試用模式（僅存在本
     return;
   }
   // detectSessionInUrl 要開著，重設密碼的信件連結才會被接住
+  sbUrl = String(cfg.SUPABASE_URL||'').replace(/\/+$/,'');
   sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
     auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true }
   });
