@@ -60,8 +60,8 @@ h1{font-size:19px;margin:0 0 4px}
 .col .pill.today{background:var(--w-accent);color:var(--w-onacc);font-weight:700}
 .col .pill.sel{background:var(--w-card);font-weight:700}
 .chips{display:flex;flex-direction:column;gap:2px;margin-top:3px;width:100%}
-.chip{height:13px;border-radius:3.5px;padding:0 2px 0 3px;display:flex;align-items:center;
-      font-size:8px;font-weight:500;white-space:nowrap;overflow:hidden}
+.chip{height:13px;border-radius:3.5px;padding:0 2px;display:flex;align-items:center;
+      font-weight:500;white-space:nowrap;overflow:hidden}
 .plus{font-size:8px;color:var(--w-muted);margin-top:1px}
 .rule{height:1px;background:var(--w-line)}
 .cards{display:flex;flex-direction:column;gap:5px}
@@ -191,7 +191,9 @@ function weekHTML(d, S, fam){
     const isT = ds===today;
     const chips = its.slice(0,rows).map(it=>{
       const c = cat(it.p);
-      return `<div class="chip" style="background:${rgba(c, it.d?.10:.20)};color:${it.d?'var(--w-muted)':c}">${esc(it.t)}</div>`;
+      const fs = shrink(it.t, 7.5, colW - 4, 0.7);
+      return `<div class="chip" style="background:${rgba(c, it.d?.10:.20)};
+        color:${it.d?'var(--w-muted)':c};font-size:${fs.toFixed(2)}px">${esc(it.t)}</div>`;
     }).join('');
     const plus = its.length>rows ? `<div class="plus">＋${its.length-rows}</div>` : '';
     return `<div class="col" style="width:${colW}px">
@@ -208,7 +210,7 @@ function weekHTML(d, S, fam){
     return `<div class="cd${it.d?' done':''}">
       <div class="bar2" style="background:${it.d?rgba(c,.35):c}"></div>
       ${it.w?`<span class="tm">${esc(it.w)}</span>`:''}
-      <span class="ti">${it.m?'★ ':''}${esc(it.t)}</span>${rt}</div>`;
+      <span class="ti" style="font-size:${shrink((it.m?'★ ':'')+it.t, 13, S.w-90, 0.72).toFixed(2)}px">${it.m?'★ ':''}${esc(it.t)}</span>${rt}</div>`;
   }).join('');
   const more = items.length>max ? `<div class="more">還有 ${items.length-max} 件</div>` : '';
   const late = (d.late||[]).length;
@@ -231,7 +233,7 @@ function smallHTML(d, S){
   const rows = items.slice(0,3).map(it=>{
     const c = cat(it.p);
     return `<div class="r"><span class="bar2" style="width:3px;height:16px;border-radius:1.5px;background:${it.d?rgba(c,.35):c};display:inline-block"></span>
-      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc((it.w?it.w+' ':'')+it.t)}</span></div>`;
+      <span style="overflow:hidden;white-space:nowrap;font-size:${shrink((it.w?it.w+' ':'')+it.t, 10.5, S.s-32, 0.7).toFixed(2)}px">${esc((it.w?it.w+' ':'')+it.t)}</span></div>`;
   }).join('');
   return `<div class="wg sm" style="width:${S.s}px;height:${S.s}px">
     <div style="display:flex;align-items:center"><span class="d">${Number(sel.slice(8,10))}</span>
@@ -261,12 +263,21 @@ const PHONES = {
   393:{w:393,h:852,name:'iPhone 15/16 Pro'},
   430:{w:430,h:932,name:'Pro Max'}
 };
-let LAYOUT_FN = null;
-async function wallpaperFn(){
-  if(LAYOUT_FN) return LAYOUT_FN;
+let WALL = null;
+async function wallpaperMod(){
+  if(WALL) return WALL;
   const src = await fetch('todo-wallpaper.js?v=' + Date.now()).then(r=>r.text());
-  LAYOUT_FN = new Function(src + '\n; return wallpaperLayout;')();
-  return LAYOUT_FN;
+  WALL = new Function(src + '\n; return {wallpaperLayout, textW, fit, wrapLines};')();
+  return WALL;
+}
+const wallpaperFn = async () => (await wallpaperMod()).wallpaperLayout;
+
+/* Scriptable 放不下文字時是「把字縮小」不是截斷（minimumScaleFactor），
+   CSS 沒有對應的東西，所以這裡自己算一次，預覽才跟手機上一致。 */
+function shrink(s, size, maxW, msf){
+  if(!WALL) return size;
+  const w = WALL.textW(s, size);
+  return w <= maxW ? size : Math.max(size * msf, size * maxW / w);
 }
 function rgbaHex(hex, a){
   if(a === undefined || a === 1) return hex;
@@ -348,9 +359,12 @@ document.getElementById('thm').onclick = ()=>{
   document.getElementById('thm').textContent = isDark() ? '淺色' : '深色';
   draw();
 };
-const qf = new URLSearchParams(location.search).get('feed');
-if(qf){ document.getElementById('feed').value = qf; document.getElementById('go').click(); }
-else draw();
+(async ()=>{
+  await wallpaperMod();                 // 字寬估算要先就位，第一次畫才準
+  const qf = new URLSearchParams(location.search).get('feed');
+  if(qf){ document.getElementById('feed').value = qf; document.getElementById('go').click(); }
+  else draw();
+})();
 </script>
 </body>
 </html>

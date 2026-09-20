@@ -232,14 +232,16 @@ function chip(col, it, colW){
   const box = col.addStack();
   box.size = new Size(colW, 13);
   box.cornerRadius = 3.5;
-  box.setPadding(0, 3, 0, 2);
+  box.setPadding(0, 2, 0, 2);
   box.centerAlignContent();
   box.backgroundColor = catColor(it.p, it.d ? 0.10 : 0.20);
   const t = box.addText(it.t);
-  t.font = Font.mediumSystemFont(8);
+  // 欄寬只有四十幾點。Scriptable 放不下時是「縮字」不是截斷，
+  // 所以把 minimumScaleFactor 放寬：短標題維持 7.5，長標題自己縮到看得完為止。
+  t.font = Font.mediumSystemFont(7.5);
   t.textColor = it.d ? C.muted : c;
   t.lineLimit = 1;
-  t.minimumScaleFactor = 0.85;
+  t.minimumScaleFactor = 0.7;
 }
 
 /** 下方的一張卡片：左側色條 + 時間 + 標題 + 右側狀態 */
@@ -267,7 +269,7 @@ function card(w, it, d, ds){
   ti.font = Font.systemFont(13);
   ti.textColor = it.d ? C.muted : C.ink;
   ti.lineLimit = 1;
-  ti.minimumScaleFactor = 0.8;
+  ti.minimumScaleFactor = 0.72;
 
   row.addSpacer();
 
@@ -351,10 +353,10 @@ function smallWidget(d, off){
       b.backgroundColor = it.d ? catColor(it.p, 0.35) : catColor(it.p);
       r.addSpacer(6);
       const t = r.addText((it.w ? it.w + ' ' : '') + it.t);
-      t.font = Font.systemFont(11);
+      t.font = Font.systemFont(10.5);
       t.textColor = it.d ? C.muted : C.ink;
       t.lineLimit = 1;
-      t.minimumScaleFactor = 0.8;
+      t.minimumScaleFactor = 0.7;
     });
     if (items.length > 3){
       w.addSpacer(4);

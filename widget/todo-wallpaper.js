@@ -47,8 +47,8 @@ function wallpaperLayout(data, W, H, dark){
   const M      = 14;                                   // 左右邊界
   const GAP    = 3;                                    // 欄距
   const colW   = (W - M*2 - GAP*6) / 7;
-  const CHIP_H = 34, CHIP_GAP = 4, ROWS = 3;           // 每天最多三條
-  const CARD_H = 46, CARD_GAP = 6;                     // 幾張卡片由剩餘高度決定
+  const CHIP_H = 40, CHIP_GAP = 4, ROWS = 3;           // 每天最多三條；格子夠高，標題可折兩行
+  const CARD_H = 44, CARD_GAP = 6;                     // 幾張卡片由剩餘高度決定
   const PANEL_PAD = 14;
   // 起點壓在 iOS 自己的鎖定畫面小工具列（約螢幕高 0.26–0.32）下面，免得疊在一起
   const top    = Math.round(H * 0.33) + PANEL_PAD;
@@ -87,17 +87,22 @@ function wallpaperLayout(data, W, H, dark){
       ops.push({op:'rect', x, y, w:colW, h:CHIP_H, r:7, fill:c,
                 alpha: it.d ? T.chipDoneA : T.chipA});
       const tc = it.d ? T.muted : c;
-      const tw2 = colW - 6;
+      // 欄寬只有四十幾點，一行放不下四、五個字以上，所以標題折兩行；
+      // 內距也收到 2，每省一點就多看得到半個字。
+      const tx2 = x + 2, tw2 = colW - 4, LH = 12;
+      const title = (it.m ? '★' : '') + it.t;
       if (it.w){
-        ops.push({op:'text', x:x+3, y:y+3.5, w:tw2, h:10,
-                  s:fit(startTime(it.w), 8, tw2), size:8, color:tc, align:'left'});
-        ops.push({op:'text', x:x+3, y:y+15, w:tw2, h:14,
-                  s:fit((it.m?'★':'')+it.t, 9.5, tw2), size:9.5, weight:'medium',
-                  color:tc, align:'left'});
+        ops.push({op:'text', x:tx2, y:y+3, w:tw2, h:9,
+                  s:fit(startTime(it.w), 7.5, tw2), size:7.5, color:tc, align:'left'});
+        const f = fitLines(title, 9, tw2, 2, 7);
+        const y0 = y + 13 + (CHIP_H - 16 - f.lines.length*LH) / 2;
+        f.lines.forEach((ln, k) => ops.push({op:'text', x:tx2, y:y0+k*LH, w:tw2, h:LH,
+                  s:ln, size:f.size, weight:'medium', color:tc, align:'left'}));
       } else {
-        ops.push({op:'text', x:x+3, y:y+9.5, w:tw2, h:15,
-                  s:fit((it.m?'★':'')+it.t, 10, tw2), size:10, weight:'medium',
-                  color:tc, align:'left'});
+        const f = fitLines(title, 9.5, tw2, 2, 7.5);
+        const y0 = y + (CHIP_H - f.lines.length*(LH+1)) / 2;
+        f.lines.forEach((ln, k) => ops.push({op:'text', x:tx2, y:y0+k*(LH+1), w:tw2, h:LH+1,
+                  s:ln, size:f.size, weight:'medium', color:tc, align:'left'}));
       }
     });
     if (its.length > ROWS){
@@ -111,9 +116,11 @@ function wallpaperLayout(data, W, H, dark){
   /* ---- 當天卡片 ----
      鎖定畫面下緣有手電筒、相機與 home indicator，畫到那裡就被蓋掉了。
      所以卡片放幾張不是寫死的，是看週曆畫完之後還剩多少高度。 ---- */
+  // 0.855：手電筒與相機那兩顆大約在螢幕高的 0.88 起跳，留這麼多就夠，
+  // 再保守下去會平白空一大塊、卡片卻少一張。
   const FOOT_H = 20;
-  const room   = H * 0.84 - (bottom + 12) - FOOT_H - PANEL_PAD;
-  const CARDS  = Math.max(1, Math.min(4, Math.floor((room + CARD_GAP) / (CARD_H + CARD_GAP))));
+  const room   = H * 0.855 - (bottom + 12) - FOOT_H - PANEL_PAD;
+  const CARDS  = Math.max(1, Math.min(5, Math.floor((room + CARD_GAP) / (CARD_H + CARD_GAP))));
   const shown  = items.slice(0, CARDS);
 
   let cy = bottom + 12;
@@ -186,6 +193,62 @@ function fit(s, size, maxW){
     out += ch;
   }
   return out + '…';
+}
+
+// 中文可以在任何地方斷，英數不行——「拍攝 TikTok 影片」斷成「拍攝 TikT / ok 影片」很難看。
+// 冒號也收進來，否則「門診 08:30」會被斷成「08: / 30」。
+const WORD_RE = /[0-9A-Za-z@._:+\-/]/;
+
+/** 排成最多 maxLines 行，每行不超過 maxW。
+    回傳 {lines, truncated}——truncated 表示放不完、最後一行收了省略號。 */
+function wrapLines(s, size, maxW, maxLines){
+  const chars = Array.from(String(s == null ? '' : s));
+  const lines = [];
+  let brokeWord = false;
+  let i = 0;
+  while (i < chars.length && lines.length < maxLines){
+    while (i < chars.length && chars[i] === ' ') i++;      // 換行後不要留開頭的空白
+    const start = i;
+    let cur = '';
+    while (i < chars.length && textW(cur + chars[i], size) <= maxW){ cur += chars[i]; i++; }
+    if (i === start){ cur = chars[i]; i++; }               // 單一字元就超寬：硬放，否則停不下來
+
+    // 斷點落在一串英數中間就退回那串的開頭——前提是退回後這行還有字，
+    // 而且那串本身放得進一行（放不進的話退了也沒用，只會空轉）
+    if (i < chars.length && WORD_RE.test(chars[i]) && WORD_RE.test(chars[i-1])){
+      let j = i;  while (j > start && WORD_RE.test(chars[j-1])) j--;
+      let k = i;  while (k < chars.length && WORD_RE.test(chars[k])) k++;
+      if (j > start && textW(chars.slice(j, k).join(''), size) <= maxW){
+        cur = chars.slice(start, j).join('');
+        i = j;
+      } else {
+        brokeWord = true;      // 那串本身就放不進一行，只能硬切——縮小一級也許就不必了
+      }
+    }
+
+    if (lines.length === maxLines - 1 && i < chars.length){
+      cur = fit(chars.slice(start).join(''), size, maxW);
+      lines.push(cur.replace(/\s+$/, ''));
+      return { lines, truncated: true, brokeWord };
+    }
+    lines.push(cur.replace(/\s+$/, ''));
+  }
+  return { lines, truncated: i < chars.length, brokeWord };
+}
+
+/** 先用原字級試，整個標題放不完就一階一階縮小，回傳放得完的最大字級。
+    格子只有四十幾點寬，與其把「拍攝 TikTok 影片」截成「拍攝／TikTok …」，
+    不如小半級讓它完整出現——小一點還讀得到，被截掉就真的沒了。 */
+function fitLines(s, size, maxW, maxLines, minSize){
+  let fallback = null;                       // 放得完、但英數字串被硬切開的那個字級
+  for (let sz = size; sz > minSize - 0.01; sz -= 0.5){
+    const r = wrapLines(s, sz, maxW, maxLines);
+    if (r.truncated) continue;
+    if (!r.brokeWord) return { size: sz, lines: r.lines };   // 放得完又沒切壞，就是它
+    if (!fallback) fallback = { size: sz, lines: r.lines };
+  }
+  if (fallback) return fallback;
+  return { size: minSize, lines: wrapLines(s, minSize, maxW, maxLines).lines };
 }
 
 /* ---- 日期 ---- */
