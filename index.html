@@ -213,6 +213,8 @@ header.top{
 .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none}
 .pill.warn{background:var(--hot-soft);border-color:var(--hot-line);color:var(--hot-ink)}
 .pill.warn .dot{background:var(--hot)}
+.pill.idle{color:var(--muted)}
+.pill.idle .dot{background:var(--muted);opacity:.5}
 .iconbtn{
   width:35px;height:35px;border-radius:50%;display:grid;place-items:center;
   border:1px solid var(--line);background:var(--card);color:var(--ink2);
@@ -1024,7 +1026,7 @@ select.inp{appearance:none;background-image:var(--sel-arrow);
         <span>待辦事項</span>
       </div>
       <div class="top-sp"></div>
-      <span class="pill" id="sync"><i class="dot"></i><span id="sync-t">已同步</span></span>
+      <span class="pill idle" id="sync"><i class="dot"></i><span id="sync-t">同步中</span></span>
       <button class="iconbtn" id="btn-menu" aria-label="選單">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
           <circle cx="12" cy="5" r="1.4" fill="currentColor" stroke="none"/>
@@ -1613,7 +1615,10 @@ const state = {
   page:'list', calY:0, calM:0, selDate: todayStr(),
   filter:null, impOnly:false,
   taskFilter:null, taskImpOnly:false,
-  loaded:false, online:navigator.onLine
+  loaded:false, online:navigator.onLine,
+  syncedAt:0,          // 最後一次成功拉回伺服器資料的時間（0 = 這次開啟還沒對過帳）
+  pulling:false,       // 正在拉資料
+  syncErr:false        // 有變更被伺服器退回（下次成功拉回就算重新對齊）
 };
 const queue = [];   // 待上傳操作
 let flushing = false;
@@ -1660,13 +1665,20 @@ function loadQueue(){
   }catch(e){}
 }
 
+const isDemo = () => session?.user?.id === 'demo-user';
 function setSync(){
   const el = $('#sync'), t = $('#sync-t');
   if(!el) return;
-  if(queue.length){ el.className='pill warn'; t.textContent = `待上傳 ${queue.length}`; }
-  else if(!state.online){ el.className='pill warn'; t.textContent = '離線'; }
-  else if(flushing){ el.className='pill'; t.textContent = '同步中'; }
-  else { el.className='pill'; t.textContent = '已同步'; }
+  const set = (cls, txt, title)=>{ el.className = cls; t.textContent = txt; el.title = title; };
+  // 試用模式根本沒有雲端，別讓它看起來像同步好了
+  if(isDemo())              set('pill idle','僅本機','試用模式：資料只存在這台裝置');
+  else if(queue.length)     set('pill warn', `待上傳 ${queue.length}`, '有變更還沒送上雲端');
+  else if(!state.online)    set('pill warn', '離線', '目前離線，顯示的是本機資料');
+  else if(flushing || state.pulling) set('pill idle','同步中','正在與雲端對帳');
+  else if(state.syncErr)    set('pill warn','同步異常','有變更被伺服器退回，請重新同步');
+  // 佇列空不等於同步好：這次開啟還沒成功拉回伺服器資料就不能說已同步
+  else if(!state.syncedAt)  set('pill warn','未同步','還沒成功連上雲端，顯示的是本機資料');
+  else                      set('pill','已同步','最後同步 ' + new Date(state.syncedAt).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}));
 }
 
 function enqueue(op){
@@ -1700,6 +1712,7 @@ async function flushQueue(){
         queue.shift(); saveQueue();
       }else if(permanent){
         queue.shift(); saveQueue();
+        state.syncErr = true;
         toast('有一筆資料上傳失敗：' + msg, true);
       }else{
         flushing = false; setSync();
@@ -1753,6 +1766,7 @@ async function checkSchema(){
 /* ---------- 讀取 ---------- */
 async function pullAll(){
   if(!sb || !session) return;
+  state.pulling = true; setSync();
   try{
     const [a,b,c,d,e,f] = await Promise.all([
       sb.from('schedules').select('*'),
@@ -1777,9 +1791,10 @@ async function pullAll(){
     migrateCatColors();
     rebuildDoneIndex(); rebuildSubIndex();
     state.loaded = true;
+    state.syncedAt = Date.now();      // 這一刻本機與伺服器一致，才算真的同步好
+    state.syncErr = false;
     saveCache();
     render();
-    setSync();
   }catch(err){
     console.warn('pull failed', err);
     const msg = String(err?.message||err||'');
@@ -1789,6 +1804,10 @@ async function pullAll(){
       // 離線是正常狀況，右上角的狀態已經說明了，不用再跳錯誤
       toast('連線失敗，顯示的是最後同步的資料', true);
     }
+    state.syncedAt = 0;               // 沒拉成功就不能再掛著「已同步」
+  }finally{
+    // 中途因為佇列還有東西而提前結束也要走到這裡，否則會一直卡在「同步中」
+    state.pulling = false;
     setSync();
   }
 }
@@ -3414,7 +3433,13 @@ function openMenu(){
   });
   menuEl.querySelector('[data-a=cats]').onclick   = ()=>{ closeMenu(); openCatManager(); };
   menuEl.querySelector('[data-a=widget]').onclick = ()=>{ closeMenu(); openWidgetPanel(); };
-  menuEl.querySelector('[data-a=sync]').onclick   = async ()=>{ closeMenu(); await flushQueue(); await pullAll(); toast('已重新同步'); };
+  menuEl.querySelector('[data-a=sync]').onclick   = async ()=>{
+    closeMenu(); await flushQueue(); await pullAll();
+    // 沒真的拉回來就別報喜
+    if(queue.length)        toast(`還有 ${queue.length} 筆沒送出，稍後會自動重試`, true);
+    else if(!state.syncedAt) toast('同步失敗，顯示的是本機資料', true);
+    else                    toast('已重新同步');
+  };
   menuEl.querySelector('[data-a=import]').onclick = ()=>{ closeMenu(); openImportMenu(); };
   menuEl.querySelector('[data-a=export]').onclick = ()=>{ closeMenu(); exportJSON(); };
   menuEl.querySelector('[data-a=pw]').onclick     = ()=>{ closeMenu(); openPasswordForm(); };
