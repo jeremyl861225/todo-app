@@ -40,6 +40,14 @@
   --c:#636845;                 /* 類別色的保底值，元素會用 style 覆寫 */
   --e-out:cubic-bezier(.2,.8,.25,1);
   --d-1:.14s; --d-2:.22s; --d-3:.36s;
+  /* MOTION（勾選沉底、換頁、導覽膠囊）用：減速更長的出場曲線，與一條彈簧（linear() 取樣；
+     不支援 linear() 的瀏覽器在下面的 @supports 換成 cubic-bezier，否則用到它的整條 transition 會失效） */
+  --ease-out:cubic-bezier(.16,1,.3,1);
+  --spring:linear(0, 0.0442, 0.1498, 0.2848, 0.4269, 0.5618, 0.6811, 0.781, 0.8608, 0.9216, 0.9656, 0.9957, 1.0146, 1.0251, 1.0296, 1.0299, 1.0277, 1.024, 1.0198, 1.0156, 1.0117, 1.0083, 1.0055, 1.0034, 1.0018, 1.0006, 0.9999, 0.9994, 1);
+  --spring-d:560ms;
+}
+@supports not (transition-timing-function:linear(0, 1)){
+  :root{--spring:cubic-bezier(.2,.9,.3,1.04)}
 }
 
 /* ---------- 淺色：燕麥紙。色票的橄欖與赭石落在暖砂底上 ---------- */
@@ -78,6 +86,7 @@
   --sh-3:0 24px 64px rgba(19,62,80,.26);
   --sh-fab:0 6px 20px rgba(19,62,80,.3);
   --sh-fab-hi:0 10px 26px rgba(19,62,80,.36);
+  --sh-lift:0 18px 36px -12px rgba(19,62,80,.34), 0 4px 10px rgba(19,62,80,.1);   /* 勾完成後浮起、沉到底部的那一列 */
   --mark-img:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 30' preserveAspectRatio='none'%3E%3Cg fill='%23F4A14F'%3E%3Cpath d='M2.2 8.8C42 8 80 8.6 118 7.8 147 7.2 173 7.8 197.6 6.8L198.4 22.4C171 23.6 143 22.9 113 23.7 79 24.6 44 23.9 3.2 24.7Z' fill-opacity='.55'/%3E%3Cpath d='M6.6 10.4C20 9.8 33 10.5 47.4 9.9L47.9 23.2C34 23.7 20 23 7.1 23.6Z' fill-opacity='.3'/%3E%3Cpath d='M120.4 9.1C139 8.7 158 9.2 176.2 8.6L176.8 21.6C158 22.2 139 21.7 120.9 22.2Z' fill-opacity='.22'/%3E%3C/g%3E%3C/svg%3E");
 }
 
@@ -115,6 +124,7 @@
     --sh-3:0 24px 64px rgba(0,0,0,.66);
     --sh-fab:0 6px 20px rgba(0,0,0,.5);
     --sh-fab-hi:0 10px 26px rgba(0,0,0,.6);
+    --sh-lift:0 22px 44px -12px rgba(0,0,0,.78), 0 4px 10px rgba(0,0,0,.42);
   --mark-img:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 30' preserveAspectRatio='none'%3E%3Cg fill='%23F4A14F'%3E%3Cpath d='M2.2 8.8C42 8 80 8.6 118 7.8 147 7.2 173 7.8 197.6 6.8L198.4 22.4C171 23.6 143 22.9 113 23.7 79 24.6 44 23.9 3.2 24.7Z' fill-opacity='.3'/%3E%3Cpath d='M6.6 10.4C20 9.8 33 10.5 47.4 9.9L47.9 23.2C34 23.7 20 23 7.1 23.6Z' fill-opacity='.17'/%3E%3Cpath d='M120.4 9.1C139 8.7 158 9.2 176.2 8.6L176.8 21.6C158 22.2 139 21.7 120.9 22.2Z' fill-opacity='.13'/%3E%3C/g%3E%3C/svg%3E");
   }
 }
@@ -150,6 +160,7 @@
   --sh-3:0 24px 64px rgba(0,0,0,.66);
   --sh-fab:0 6px 20px rgba(0,0,0,.5);
   --sh-fab-hi:0 10px 26px rgba(0,0,0,.6);
+  --sh-lift:0 22px 44px -12px rgba(0,0,0,.78), 0 4px 10px rgba(0,0,0,.42);
   --mark-img:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 30' preserveAspectRatio='none'%3E%3Cg fill='%23F4A14F'%3E%3Cpath d='M2.2 8.8C42 8 80 8.6 118 7.8 147 7.2 173 7.8 197.6 6.8L198.4 22.4C171 23.6 143 22.9 113 23.7 79 24.6 44 23.9 3.2 24.7Z' fill-opacity='.3'/%3E%3Cpath d='M6.6 10.4C20 9.8 33 10.5 47.4 9.9L47.9 23.2C34 23.7 20 23 7.1 23.6Z' fill-opacity='.17'/%3E%3Cpath d='M120.4 9.1C139 8.7 158 9.2 176.2 8.6L176.8 21.6C158 22.2 139 21.7 120.9 22.2Z' fill-opacity='.13'/%3E%3C/g%3E%3C/svg%3E");
 }
 
@@ -235,6 +246,19 @@ header.top{
 .nav button:hover{color:var(--ink)}
 .nav button.on{background:var(--card);color:var(--accent-ink);box-shadow:var(--sh-1)}
 .nav svg{width:17px;height:17px;flex:none}
+/* 導覽的動態：按下縮一點、選中的膠囊滑到新分頁（見 JS 的 navMove）。
+   平常選中的底色仍畫在按鈕自己身上（跟原本一模一樣）；只有滑動的那半秒，底色交給 .nav-ind 這顆膠囊，
+   它的底色與陰影照抄 .nav button.on（手機是 --accent-soft，見下方手機區塊）。
+   isolation 讓 .nav 自成一層：膠囊用 z-index:-1 墊在按鈕文字底下，但仍在 .nav 自己的底色之上。 */
+.nav{position:relative;isolation:isolate}
+.nav button{transition:background var(--d-2),color var(--d-2),box-shadow var(--d-2),transform var(--spring-d) var(--spring)}
+.nav button.press{transform:scale(.92)}
+.nav-ind{position:absolute;left:0;top:0;width:0;height:0;z-index:-1;border-radius:999px;pointer-events:none;display:none}
+.nav-ind>span{position:absolute;inset:0;border-radius:inherit;background:var(--card);box-shadow:var(--sh-1)}
+.nav.ind-run .nav-ind{display:block}
+.nav.ind-run button{transition:color var(--d-2),transform var(--spring-d) var(--spring)}
+.nav.ind-run button.on{background:transparent;box-shadow:none}
+.nav.ind-snap button{transition:none !important}
 
 main{padding:var(--s-6) 0 var(--s-9)}
 
@@ -644,6 +668,24 @@ span.star svg{width:100%;height:100%;display:block}
 .pop .ck.on{animation:ck-pop var(--d-3) var(--e-out)}
 .pop .ck.on svg path{stroke-dasharray:26;animation:ck-draw .3s .05s var(--e-out) backwards}
 
+/* ---------- MOTION：勾完成後的狀態 class（JS 的 completeWithMotion／flipPlay 加上、動完就拿掉） ---------- */
+/* 刪除線由左往右畫出來（JS 的 strikeDraw）。標題 .ti／.dt 自己的 line-through 先改成透明（線還在、版面不動），
+   正上方疊一份一模一樣、但字與 ✦、螢光筆都透明的複本，只露出複本自己的 line-through，用 clip-path 由左往右揭開。
+   畫出來的就是原生的那一條線（同一個位置、同一個像素對齊），畫完拿掉複本、換回原本的線時不會跳。 */
+.strike-run{position:relative;text-decoration-color:transparent !important}
+.strike-ghost{position:absolute;inset:0;pointer-events:none;user-select:none;-webkit-user-select:none;color:transparent !important}
+.strike-ghost .star{visibility:hidden}
+.strike-ghost .hl{background:none !important;animation:none !important}
+/* 正在沉到底部的那一列：浮起來（實心卡片底、較深的影、蓋在其他列上面）；落地時影子與底色淡回原樣 */
+.row-lift{position:relative;z-index:5;transition:none !important;
+  background:var(--card) !important;box-shadow:var(--sh-lift) !important}
+.item.imp.row-lift{box-shadow:var(--sh-lift), inset 0 0 0 1.5px var(--imp-ring) !important}
+.row-land{transition:background var(--d-2),box-shadow var(--d-3) var(--e-out) !important}
+.row-rise{position:relative;z-index:4}
+/* 勾完成時從勾選框噴出的小粒子與一圈環（JS 的 burst；有粒子時才掛上，噴完就移除） */
+.burst{position:fixed;inset:0;z-index:55;pointer-events:none;overflow:hidden;contain:strict}
+.burst span{position:absolute;left:0;top:0;display:block;border-radius:50%}
+
 /* ---------- FAB ---------- */
 .fab{
   position:fixed;right:max(var(--s-5),env(safe-area-inset-right));
@@ -915,6 +957,7 @@ select.inp{appearance:none;background-image:var(--sel-arrow);
   }
   .nav button{height:46px;flex-direction:row;font-size:var(--t-sm)}
   .nav button.on{background:var(--accent-soft)}
+  .nav-ind>span{background:var(--accent-soft)}
   body.app-on{padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom))}
   .wrap{padding:0 13px}
   .top-in{min-height:54px}
@@ -1038,6 +1081,7 @@ select.inp{appearance:none;background-image:var(--sel-arrow);
   </header>
     <div class="wrap" id="nav-holder">
       <nav class="nav" id="nav">
+        <span class="nav-ind" aria-hidden="true"><span></span></span>
         <button data-p="list" class="on">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6.5l2 2 3.5-4"/><path d="M3.5 13l2 2 3.5-4"/><path d="M3.5 19.5l2 2 3.5-4"/><path d="M13 6h8M13 12.5h8M13 19h8"/></svg>
           重複排程
@@ -2214,6 +2258,7 @@ function renderCal(){
   gridEl.innerHTML = weeksHtml.join('');
 
   $$('.cell', $('#cal-grid')).forEach(c=>c.onclick = ()=>{
+    flushMotion();          // 剛勾的那一列還在等沉底：先做掉，否則它晚一步的重畫會切掉新那天的進場動畫
     state.selDate = c.dataset.d;
     const d = parseYmd(state.selDate);
     if(d.getMonth()!==state.calM || d.getFullYear()!==state.calY){
@@ -2223,6 +2268,7 @@ function renderCal(){
   });
   $$('.bar-ev', $('#cal-grid')).forEach(b=>b.onclick = ev=>{
     ev.stopPropagation();
+    flushMotion();
     const e = state.events.find(x=>x.id===b.dataset.e);
     if(!e) return;
     // 選取日還在這個行程範圍內就沿用，否則跳到這一段的第一天
@@ -2234,6 +2280,286 @@ function renderCal(){
   });
   renderDay();
 }
+
+/* ============================================================
+   MOTION：勾選完成 → 原地打勾＋粒子 → 卡片沉到最下面（FLIP）
+   ============================================================
+   時間軸：0 ms 原地打勾（勾勾彈一下並描出、刪除線由左畫到右、勾選框噴出小粒子與一圈環）
+          → HOLD_MS 後才重畫；重畫前後各量一次位置（FLIP），被勾的那張「浮起」
+            （實心底＋深影＋微放大）沿彈簧曲線落到新位置，其他卡片同時滑上來補位。
+   取消勾選不等待，直接歸位。減少動態：不等待、不位移——WAAPI 不受 CSS 那條全域
+   reduced-motion 規則管，所以這裡每次都自己判斷。資料在呼叫前就已經改好，這裡只管畫面。 */
+const HOLD_MS = 260;
+const reduceMotion = () => { try{ return matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; } };
+let springEase = null;
+/** CSS 的 --spring（linear() 彈簧曲線）；不支援 linear() 的舊瀏覽器退回 cubic-bezier */
+function motionEase(){
+  if(springEase) return springEase;
+  let v = '';
+  try{ v = getComputedStyle(document.documentElement).getPropertyValue('--spring').trim(); }catch(e){}
+  springEase = (v && window.CSS && CSS.supports && CSS.supports('transition-timing-function', v))
+    ? v : 'cubic-bezier(.2,.9,.3,1.04)';
+  return springEase;
+}
+/** 阻尼彈簧（勁度 k、阻尼 c、質量 m）取樣成 linear() 曲線與它安定下來所需的時間 */
+function springCurve(k, c, m){
+  const w0 = Math.sqrt(k / m), z = c / (2 * Math.sqrt(k * m));
+  const x = t => {
+    if(z < 1){
+      const wd = w0 * Math.sqrt(1 - z * z);
+      return 1 - Math.exp(-z * w0 * t) * (Math.cos(wd * t) + (z * w0 / wd) * Math.sin(wd * t));
+    }
+    return 1 - Math.exp(-w0 * t) * (1 + w0 * t);
+  };
+  let T = .2;
+  for(let t = 0; t < 2; t += 1/240) if(Math.abs(1 - x(t)) > .004) T = t + 1/60;
+  const pts = [];
+  for(let i = 0; i <= 40; i++) pts.push(i === 40 ? 1 : +x(T * i / 40).toFixed(4));
+  const s = `linear(${pts.join(', ')})`;
+  const ok = window.CSS && CSS.supports && CSS.supports('transition-timing-function', s);
+  return { easing: ok ? s : 'cubic-bezier(.2,.9,.3,1.04)', duration: Math.round(T * 1000) };
+}
+function rectOf(el){ try{ return el ? el.getBoundingClientRect() : null; }catch(e){ return null; } }
+
+/** 勾完成的粒子：從勾選框中心往上方扇形噴出 10 顆小圓點＋一圈淡出的環。
+    圖層是蓋在畫面上、不吃點擊的 fixed 層，有粒子時才掛上、噴完就拿掉 */
+const BURST_COLORS = ['var(--done)', 'var(--done-ink)', 'var(--accent)', 'var(--hot)'];
+let burstLayer = null, burstLive = 0;
+function burst(r){
+  if(!r || reduceMotion() || !(r.width || r.height)) return;
+  const x = r.left + r.width / 2, y = r.top + r.height / 2, size = Math.max(r.width, r.height) || 23;
+  if(!Number.isFinite(x) || !Number.isFinite(y)) return;
+  try{
+    if(!burstLayer){
+      burstLayer = document.createElement('div');
+      burstLayer.className = 'burst';
+      burstLayer.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(burstLayer);
+    }
+    const g = document.createElement('span');
+    g.style.transform = `translate(${x}px,${y}px)`;
+    const ring = document.createElement('span'), rs = size + 10;
+    Object.assign(ring.style, { width: rs + 'px', height: rs + 'px', left: -rs / 2 + 'px', top: -rs / 2 + 'px',
+      border: '2px solid var(--done-ink)', boxSizing: 'border-box' });
+    g.appendChild(ring);
+    ring.animate([{ transform:'scale(.45)', opacity:.55 }, { transform:'scale(2.3)', opacity:0 }],
+                 { duration:500, easing:'cubic-bezier(.2,.7,.3,1)', fill:'both' });
+    const n = 10;
+    for(let i = 0; i < n; i++){
+      // 以正上方為中心、左右各 115° 的扇形往外噴，略帶隨機
+      const a = (-90 + (i / (n - 1) - .5) * 230 + (Math.random() - .5) * 18) * Math.PI / 180;
+      const dist = size * .8 + 12 + Math.random() * 18, s = 4 + Math.random() * 3;
+      const dx = Math.cos(a) * dist, dy = Math.sin(a) * dist - 4;
+      const d = document.createElement('span');
+      Object.assign(d.style, { width: s + 'px', height: s + 'px', left: -s / 2 + 'px', top: -s / 2 + 'px',
+        background: BURST_COLORS[i % BURST_COLORS.length] });
+      g.appendChild(d);
+      d.animate([
+        { transform:'translate(0,0) scale(0)' },
+        { transform:`translate(${(dx / 2).toFixed(1)}px,${(dy / 2).toFixed(1)}px) scale(1)` },
+        { transform:`translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px) scale(0)` }
+      ], { duration:600, delay:i * 30, easing:'ease-out', fill:'both' });
+    }
+    burstLayer.appendChild(g);
+    burstLive++;
+    setTimeout(()=>{
+      g.remove();
+      if(--burstLive <= 0 && burstLayer){ burstLayer.remove(); burstLayer = null; burstLive = 0; }
+    }, 1000);
+  }catch(e){}
+}
+
+/** 刪除線由左往右畫出來（樣式見 .strike-run／.strike-ghost）：標題自己的線改透明，疊一份只露出線的複本，
+    用 clip-path 從字的左緣揭到右緣。since＝已經畫了多久（重畫後的新元素從這裡接著畫）。
+    畫完拿掉複本，原本的線回來，兩者是同一條線，所以不會跳。 */
+const STRIKE_MS = 420;
+function strikeDraw(ti, since){
+  if(!ti || since >= STRIKE_MS || reduceMotion()) return;
+  try{
+    ti.querySelector(':scope > .strike-ghost')?.remove();
+    ti.classList.remove('strike-run');
+    const box = ti.getBoundingClientRect();
+    let x0 = Infinity, x1 = -Infinity;
+    for(const r of ($('.tt', ti) || ti).getClientRects()){
+      if(r.width){ x0 = Math.min(x0, r.left); x1 = Math.max(x1, r.right); }
+    }
+    if(!(x1 > x0) || !box.width) return;
+    const g = ti.cloneNode(true);
+    g.classList.add('strike-ghost');
+    g.setAttribute('aria-hidden', 'true');
+    g.style.textDecorationColor = getComputedStyle(ti).color;   // 複本的字是透明的，線要用原本的字色
+    ti.classList.add('strike-run');
+    ti.appendChild(g);
+    const W = box.width, from = Math.max(0, W - (x0 - box.left)), to = Math.max(0, W - (x1 - box.left) - 2);
+    const anim = g.animate([{ clipPath:`inset(0 ${from.toFixed(1)}px 0 0)` }, { clipPath:`inset(0 ${to.toFixed(1)}px 0 0)` }],
+                           { duration:STRIKE_MS, delay:-Math.round(since), easing:'cubic-bezier(.16,1,.3,1)', fill:'both' });
+    const end = ()=>{ g.remove(); ti.classList.remove('strike-run'); };
+    anim.onfinish = end; anim.oncancel = end;
+  }catch(e){ ti.classList.remove('strike-run'); }
+}
+/** 剛勾完、勾勾與刪除線還在播的列：key → 勾下去的時間。重畫會把元素換掉，
+    新元素的勾勾彈跳、描線與刪除線都從播到的地方接著播，不從頭重播，也不突然跳到終點 */
+const ticking = new Map();
+function resumeTicks(rows, keyOf, titleSel){
+  const now = performance.now();
+  for(const [key, t0] of ticking){
+    const since = now - t0;
+    if(since >= STRIKE_MS || reduceMotion()){ ticking.delete(key); continue; }
+    const el = rows.find(e => keyOf(e) === key);
+    if(!el || !el.classList.contains('done')) continue;
+    const ck = $('.ck.on', el), path = ck && $('svg path', ck);
+    if(ck){
+      el.classList.add('pop');
+      ck.style.animationDelay = `-${Math.round(since)}ms`;
+      if(path) path.style.animationDelay = `${Math.round(50 - since)}ms`;
+    }
+    strikeDraw($(titleSel, el), since);
+  }
+}
+
+/** First：量出容器裡每個 key 的位置 */
+function flipFirst(root, sel, keyOf){
+  const m = new Map();
+  if(!root) return m;
+  for(const el of $$(sel, root)){ const k = keyOf(el); if(k) m.set(k, el.getBoundingClientRect()); }
+  return m;
+}
+/** 還在飛的「浮起列」：key → 預計落地的時間。連續勾選時下一次重畫會重建這些元素，
+    要讓它們接著以浮起的樣子飛完，而不是掉回普通列、從半空重新起跳 */
+const liftingUntil = new Map();
+/** 落地：拿掉浮起的樣子，影子與底色用短短的過渡淡回原樣 */
+function landRow(el){
+  if(!el.classList.contains('row-lift')) return;
+  el.classList.remove('row-lift');
+  el.classList.add('row-land');
+  setTimeout(()=>el.classList.remove('row-land'), 420);
+}
+/** Last／Invert／Play：重畫後把每個元素從舊位置動畫回新位置；liftKeys 裡的浮起來走 */
+function flipPlay(root, sel, keyOf, first, liftKeys, riseKey){
+  if(!root || reduceMotion()) return;
+  const ease = motionEase();
+  const now = performance.now();
+  for(const [k, t] of liftingUntil) if(t <= now) liftingUntil.delete(k);
+  // Last：先一次量完所有新位置，再開始加 class 與動畫（邊量邊改會讓瀏覽器每一列都重排一次）
+  const els = $$(sel, root), lasts = els.map(el => el.getBoundingClientRect());
+  els.forEach((el, i)=>{
+    const k = keyOf(el), a = first.get(k), b = lasts[i];
+    try{
+      if(!a){   // 新出現的（例如「剛完成」這一組的標題）：等卡片落下時再淡入
+        el.animate([{opacity:0},{opacity:1}], {duration:260, delay:200, easing:'ease-out', fill:'backwards'});
+        return;
+      }
+      const dx = a.left - b.left, dy = a.top - b.top;
+      if(Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+      const land = ()=> landRow(el);
+      if(liftKeys.has(k)){
+        el.classList.add('row-lift');
+        const dur = Math.round(Math.min(780, 540 + Math.hypot(dx, dy) * .3));
+        liftingUntil.set(k, now + dur);
+        const anim = el.animate([
+          { transform:`translate(${dx}px,${dy}px) scale(1)`, easing:'cubic-bezier(.3,.7,.4,1)' },
+          { transform:`translate(${(dx*.94).toFixed(1)}px,${(dy*.94).toFixed(1)}px) scale(1.035)`, offset:.16, easing:ease },
+          { transform:'none' }
+        ], { duration: dur });
+        anim.onfinish = land; anim.oncancel = land;
+      }else if(liftingUntil.has(k)){
+        // 上一次勾的那張還在半空：維持浮起的樣子，從現在的位置接著落地
+        el.classList.add('row-lift');
+        const rest = Math.max(220, Math.round(liftingUntil.get(k) - now));
+        const anim = el.animate([{ transform:`translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px) scale(1.02)` }, { transform:'none' }],
+                                { duration: rest, easing:'cubic-bezier(.2,.8,.3,1)' });
+        anim.onfinish = land; anim.oncancel = land;
+      }else if(Math.abs(dx) > b.width * .5){
+        // 換到別欄（桌機的任務看板：一組清空後後面的組整批換欄）：斜著橫越整個看板太亂，
+        // 在新位置輕輕淡入就好（不從全透明開始，整片看板才不會閃一下）
+        el.animate([{opacity:.3},{opacity:1}], {duration:280, easing:'ease-out'});
+      }else{
+        const anim = el.animate([{ transform:`translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px)` }, { transform:'none' }],
+                                { duration: 560, delay: 40, easing: ease, fill:'backwards' });
+        if(k === riseKey){
+          // 剛取消勾選、彈回上面的那一列：從其他列上面滑過去，不要被後面的列蓋住
+          el.classList.add('row-rise');
+          const off = ()=> el.classList.remove('row-rise');
+          anim.onfinish = off; anim.oncancel = off;
+        }
+      }
+    }catch(e){ el.classList.remove('row-lift', 'row-rise'); }
+  });
+}
+/* 等待中的重畫。同一個清單在等待期間又勾了別列：併進同一趟（每列都原地打勾、各自噴粒子），
+   最後一下之後 HOLD_MS 才一起重畫、一起沉底。 */
+let motionPending = null;
+/** 還在等的那次重畫立刻做掉（中途要換日、換月、換頁，或有別的清單要重畫時） */
+function flushMotion(){
+  const p = motionPending;
+  if(!p) return;
+  motionPending = null;
+  clearTimeout(p.timer);
+  runMotion(p);
+}
+function runMotion(b){
+  const root0 = b.root();
+  const first = flipFirst(root0, b.sel, b.keyOf);
+  // 鍵盤勾選：焦點在勾選框上，重畫會把那顆按鈕換掉（焦點掉回 <body>）→ 記下是哪一列的哪顆，重畫後放回去
+  let focusKey = null, focusAct = null;
+  const ae = document.activeElement;
+  if(root0 && ae && ae !== document.body && root0.contains(ae)){
+    const rowEl = $$(b.sel, root0).find(el => el.contains(ae));
+    if(rowEl){ focusKey = b.keyOf(rowEl); focusAct = (ae.dataset && ae.dataset.act) || null; }
+  }
+  b.rerender();
+  const root = b.root();
+  if(!root) return;
+  const rows = $$(b.sel, root);
+  resumeTicks(rows, b.keyOf, b.titleSel);
+  if(focusKey){
+    const el = rows.find(e => b.keyOf(e) === focusKey);
+    const btn = el && ((focusAct && $(`[data-act="${focusAct}"]`, el)) || $('[data-act=ck]', el));
+    if(btn && document.activeElement !== btn){ try{ btn.focus({preventScroll:true}); }catch(e){} }
+  }
+  flipPlay(root, b.sel, b.keyOf, first, new Set(b.lifts.keys()), b.rise);
+}
+/** 勾選的共用流程。資料已經先改好了（toggleDone／setTaskDone），這裡只負責畫面。 */
+function completeWithMotion(o){
+  // 勾選框的位置一定要在任何重畫之前量（粒子從這裡噴）
+  const rect = rectOf(o.ck);
+  const same = p => p && p.rerender === o.rerender && p.sel === o.sel;
+  if(motionPending && !same(motionPending)) flushMotion();   // 別的清單還在等：先做掉
+  if(o.done) burst(rect);
+  popKey = null;                         // 原地已經彈過一次，重畫時不要再彈
+  if(reduceMotion()){
+    // 減少動態：不等、不位移，但重畫後的焦點照樣放回同一列
+    flushMotion();
+    runMotion({ rerender:o.rerender, root:o.root, sel:o.sel, keyOf:o.keyOf, titleSel:o.titleSel, lifts:new Map() });
+    return;
+  }
+  if(o.done && o.row){
+    o.row.classList.add('done', 'pop');
+    o.ck?.classList.add('on');
+    ticking.set(o.key, performance.now());
+    strikeDraw($(o.titleSel, o.row), 0);
+  }else ticking.delete(o.key);
+  const b = same(motionPending) ? motionPending
+    : { rerender:o.rerender, sel:o.sel, keyOf:o.keyOf, titleSel:o.titleSel, lifts:new Map(), timer:0 };
+  b.root = o.root;
+  if(o.done) b.lifts.set(o.key, performance.now());
+  else{ b.lifts.delete(o.key); b.rise = o.key; }
+  clearTimeout(b.timer);
+  motionPending = b;
+  // 勾完成：等 HOLD_MS（最後一下起算）再沉底；取消勾選不等，連同等待中的一起立刻歸位
+  if(o.done) b.timer = setTimeout(flushMotion, HOLD_MS);
+  else flushMotion();
+}
+const dayRowKey = el => el.dataset.k + ':' + el.dataset.id;
+/** 當日清單的勾選（清單上的勾選框與詳細內容裡的「標記完成」共用） */
+function dayCheckMotion(id, kind, ds, row, ck, wasDone){
+  completeWithMotion({
+    row, ck, titleSel:'.dt', done: !wasDone,
+    rerender: renderCal, root: ()=>$('#dp-list'), sel:'.drow', keyOf: dayRowKey, key: kind + ':' + id
+  });
+}
+const taskKey = el => el.classList.contains('group-h')
+  ? 'g:' + ($('.t', el)?.textContent || '') : 't:' + el.dataset.id;
 
 function renderDay(){
   const ds = state.selDate, d = parseYmd(ds);
@@ -2269,8 +2595,8 @@ function renderDay(){
       </button>
       <button class="dmain" data-act="open">
         <span class="dt">${r.important?STAR:''}${r.important
-          ? `<span class="hl">${esc(r.title)}</span>`
-          : esc(r.title)}</span>
+          ? `<span class="hl"><span class="tt">${esc(r.title)}</span></span>`
+          : `<span class="tt">${esc(r.title)}</span>`}</span>
         <span class="dsub">
           ${r.time_text?`<span class="tag time">${esc(r.time_text)}</span>`:''}
           ${kindTag}
@@ -2289,9 +2615,10 @@ function renderDay(){
     const rec = kind==='schedule'
       ? state.schedules.find(x=>x.id===id)
       : state.events.find(x=>x.id===id);
-    $('[data-act=ck]', row).onclick = ()=>{
+    $('[data-act=ck]', row).onclick = e=>{
+      const wasDone = isDone(id, ds);
       toggleDone(id, kind, ds);
-      renderCal();
+      dayCheckMotion(id, kind, ds, row, e.currentTarget, wasDone);
     };
     $('[data-act=open]', row).onclick = ()=>{
       if(rec) openDetail({kind, row:rec, mode:'calendar', date:ds});
@@ -2315,7 +2642,7 @@ function taskCardHTML(t){
   return `<div class="item task ${t.done?'done':''} ${t.important?'imp':''}${takePop(t.id)}" data-id="${esc(t.id)}" style="--c:${col}">
     <button class="ck ${t.done?'on':''}" data-act="ck" aria-label="${t.done?'取消完成':'標記完成'}">${CK_SVG}</button>
     <button class="bd" data-act="open">
-      <span class="ti">${t.important?STAR:''}${esc(t.title)}</span>
+      <span class="ti">${t.important?STAR:''}<span class="tt">${esc(t.title)}</span></span>
       ${(!t.done && nx)?`<span class="nextsub">${SVG(IC.next)}<em>${esc(nx.title)}</em></span>`:''}
       <span class="mt">
         ${t.done
@@ -2337,10 +2664,17 @@ function wireTaskCards(root){
   $$('.item.task', root).forEach(card=>{
     const t = state.tasks.find(x=>x.id===card.dataset.id);
     if(!t) return;
-    $('[data-act=ck]', card).onclick = ()=>{
-      setTaskDone(t, !t.done);
-      render();
-      toast(t.done ? '已取消完成' : `已完成，兩天後移入「已完成」`);
+    $('[data-act=ck]', card).onclick = e=>{
+      // 勾完後這張卡要等 HOLD_MS 才重畫，期間再點一次同一格要能取消：讀目前的資料，不用這張卡建立時的 t
+      const cur = state.tasks.find(x=>x.id===t.id) || t;
+      const done = !cur.done;
+      setTaskDone(cur, done);
+      completeWithMotion({
+        row: card, ck: e.currentTarget, titleSel:'.ti', done,
+        rerender: render, root: ()=>$(state.page==='done' ? '#done-body' : '#task-body'),
+        sel: '.item.task, .group-h', keyOf: taskKey, key: 't:' + t.id
+      });
+      toast(done ? `已完成，兩天後移入「已完成」` : '已取消完成');
     };
     $('[data-act=open]', card).onclick = ()=> openTaskDetail(t);
   });
@@ -2831,9 +3165,14 @@ function openDetail({kind, row, mode, date}){
 
   const ck = $('#dv-ck', m.ov);
   if(ck) ck.onclick = ()=>{
+    const wasDone = isDone(row.id, date);
     toggleDone(row.id, kind, date);
     m.close();
-    renderCal();
+    // 面板收掉後，後面那一列照樣原地打勾、再沉到底部
+    const el = date === state.selDate
+      ? $$('#dp-list .drow').find(e=>e.dataset.id === row.id && e.dataset.k === kind) : null;
+    if(el) dayCheckMotion(row.id, kind, date, el, $('[data-act=ck]', el), wasDone);
+    else renderCal();
   };
 
   /* 單次挪動：選好日期後只寫進這條排程的 moves 例外，規則本身不動 */
@@ -4021,20 +4360,152 @@ function openWidgetPanel(){
    ============================================================ */
 const PAGES = ['list','cal','task'];
 function setPage(p){
+  flushMotion();            // 等待中的沉底重畫要在換頁「之前」做掉：它的重畫與量測都跟著目前這一頁
+  const from = state.page;
+  const moving = from !== p && !reduceMotion();
   state.page = p;
   const nav = p==='done' ? 'task' : p;      // 「已完成」是近期任務的子頁，分頁列仍亮在近期任務
+  const navFrom = $('#nav button.on'), navTo = $(`#nav button[data-p="${nav}"]`);
+  if(moving && navFrom && navTo && navFrom !== navTo) navMove(navFrom, navTo);
   $$('#nav button').forEach(b=>b.classList.toggle('on', b.dataset.p===nav));
   $('#p-list').classList.toggle('hide', p!=='list');
   $('#p-cal').classList.toggle('hide',  p!=='cal');
   $('#p-task').classList.toggle('hide', p!=='task');
   $('#p-done').classList.toggle('hide', p!=='done');
   $('#fab').classList.toggle('hide', p==='done');
-  $('#fab-t').textContent = p==='list' ? '新增排程' : p==='cal' ? '新增行程' : '新增任務';
+  const fabT = $('#fab-t');
+  const fabLabel = p==='list' ? '新增排程' : p==='cal' ? '新增行程' : '新增任務';
+  if(fabT.textContent !== fabLabel){
+    fabT.textContent = fabLabel;
+    // 換頁時 FAB 的字由下往上捲進來、＋ 號轉四分之一圈
+    if(moving) try{
+      fabT.animate([{opacity:0, transform:'translateY(70%)'}, {opacity:1, transform:'none'}],
+                   {duration:380, easing: motionEase()});
+      $('#fab svg')?.animate([{transform:'rotate(-90deg) scale(.8)'}, {transform:'none'}],
+                   {duration:460, easing: motionEase()});
+    }catch(e){}
+  }
   try{ localStorage.setItem('todo.page', nav); }catch(e){}
   window.scrollTo({top:0});
   render();
+  // 新的一頁由下方輕輕浮上來（短淡入＋12px 位移）；播完不留 transform
+  if(moving) try{
+    $('#p-' + p)?.animate([{opacity:0, transform:'translateY(12px)'}, {opacity:1, transform:'none'}],
+                          {duration:420, easing:'cubic-bezier(.16,1,.3,1)'});
+  }catch(e){}
+}
+
+/* ---------- 導覽的動態 ----------
+   選中的膠囊（.nav-ind）從舊分頁彈簧滑到新分頁，移動中帶一點液滴拉伸；被點的那顆圖示播一次自己的小動畫。
+   平常 .nav-ind 是藏起來的，選中的底色畫在按鈕自己身上（與原本完全相同）；滑動那半秒才由膠囊代畫，
+   落地的同一格換回按鈕自己的底色。按下時整顆按鈕縮到 .92（.press，放開以 --spring 彈回）。 */
+const NAV_SPRING = springCurve(420, 32, .9);
+let navAnim = null, navSquash = null;
+/** 按鈕在 .nav 裡的版面位置（扣掉按下縮放的 transform，相對於 .nav 的 padding box） */
+function navBox(nav, el){
+  const r = el.getBoundingClientRect(), n = nav.getBoundingClientRect();
+  let sx = 1, sy = 1;
+  try{
+    const t = getComputedStyle(el).transform;
+    if(t && t !== 'none'){ const mx = new DOMMatrixReadOnly(t); sx = mx.a || 1; sy = mx.d || 1; }
+  }catch(e){}
+  const w = r.width / sx, h = r.height / sy;
+  return { x: r.left + r.width / 2 - w / 2 - n.left - nav.clientLeft,
+           y: r.top + r.height / 2 - h / 2 - n.top - nav.clientTop, w, h };
+}
+function navMove(fromBtn, toBtn){
+  const nav = $('#nav'), ind = nav && $('.nav-ind', nav);
+  if(!ind || reduceMotion() || !nav.getClientRects().length) return;
+  try{
+    // 上一次還在滑：從膠囊現在的位置接著滑
+    const running = nav.classList.contains('ind-run');
+    const a = running ? navBox(nav, ind) : navBox(nav, fromBtn);
+    const b = navBox(nav, toBtn);
+    const px = v => v.toFixed(3) + 'px';
+    if(navAnim){ navAnim.onfinish = null; navAnim.cancel(); }
+    if(navSquash) navSquash.cancel();
+    nav.classList.add('ind-run');
+    Object.assign(ind.style, { left: px(b.x), top: px(b.y), width: px(b.w), height: px(b.h) });
+    const anim = navAnim = ind.animate([
+      { left: px(a.x), top: px(a.y), width: px(a.w), height: px(a.h) },
+      { left: px(b.x), top: px(b.y), width: px(b.w), height: px(b.h) }
+    ], { duration: NAV_SPRING.duration, easing: NAV_SPRING.easing });
+    navSquash = ind.firstElementChild.animate(
+      [{ transform:'none' }, { transform:'scale(1.14,.88)', offset:.38 }, { transform:'none' }],
+      { duration:380, easing:'ease-out' });
+    anim.onfinish = ()=>{
+      if(navAnim !== anim) return;
+      navAnim = null;
+      // 同一格：藏起膠囊、按鈕自己的底色直接出現（不走 .22s 的底色過渡，否則會閃一下）
+      nav.classList.add('ind-snap');
+      nav.classList.remove('ind-run');
+      void getComputedStyle(toBtn).backgroundColor;
+      nav.classList.remove('ind-snap');
+    };
+  }catch(e){ nav.classList.remove('ind-run'); }
+  navIconPlay(toBtn);
+}
+/** 圖示的一次性小動畫：重複排程＝三個小勾依序描出；月曆＝翻一頁、上方兩個環彈一下；
+    近期任務＝夾板擺一下、描出勾 */
+const NAV_ICON_FLIP = springCurve(520, 19, .7), NAV_ICON_TILT = springCurve(420, 11, .6);
+function navIconPlay(btn){
+  const svg = btn && $('svg', btn);
+  if(!svg || reduceMotion()) return;
+  const draw = (path, delay)=>{
+    const L = path.getTotalLength ? path.getTotalLength() : 0;
+    if(!L) return;
+    path.animate([{ strokeDasharray:`${L} ${L}`, strokeDashoffset:L }, { strokeDasharray:`${L} ${L}`, strokeDashoffset:0 }],
+                 { duration:260, delay, easing:'cubic-bezier(.3,.7,.3,1)', fill:'backwards' });
+    path.animate([{ opacity:0 }, { opacity:1 }], { duration:1, delay, fill:'backwards' });
+  };
+  try{
+    const paths = $$('path', svg);
+    const p = btn.dataset.p;
+    if(p === 'list'){
+      paths.slice(0, 3).forEach((x, i)=>draw(x, 40 + i * 60));
+    }else if(p === 'cal'){
+      svg.animate([{ transform:'perspective(60px) rotateX(-80deg)', transformOrigin:'50% 35%' },
+                   { transform:'perspective(60px) rotateX(0deg)', transformOrigin:'50% 35%' }],
+                  { duration: NAV_ICON_FLIP.duration, easing: NAV_ICON_FLIP.easing });
+      // 上方兩個環彈一下。靜止時它們跟橫線是同一條 path（拆開畫，反鋸齒會差一點點），
+      // 所以只在動畫期間暫時拆成兩條，播完併回原本那一條
+      const line = paths[paths.length - 1], orig = line.getAttribute('d');
+      if(orig === 'M3 10h18M8 3v4M16 3v4'){
+        const rings = line.cloneNode(false);
+        line.setAttribute('d', 'M3 10h18');
+        rings.setAttribute('d', 'M8 3v4M16 3v4');
+        svg.appendChild(rings);
+        const a = rings.animate([{ transform:'translateY(0)' }, { transform:'translateY(-2.6px)', offset:.35 },
+                                 { transform:'translateY(.6px)', offset:.7 }, { transform:'translateY(0)' }],
+                                { duration:380, delay:50, easing:'ease-out' });
+        const join = ()=>{ rings.remove(); line.setAttribute('d', orig); };
+        a.onfinish = join; a.oncancel = join;
+      }
+    }else if(p === 'task'){
+      svg.animate([{ transform:'rotate(-8deg)', transformOrigin:'50% 12%' }, { transform:'rotate(0deg)', transformOrigin:'50% 12%' }],
+                  { duration: NAV_ICON_TILT.duration, easing: NAV_ICON_TILT.easing });
+      draw(paths[paths.length - 1], 120);
+    }
+  }catch(e){}
+}
+/** 按下縮放：只在導覽列上處理（不在整份文件掛 touchstart，免得改到其他元素在 iPhone 上的 :active） */
+let navPressWired = false;
+function wireNavPress(){
+  const nav = $('#nav');
+  if(!nav || navPressWired) return;   // startApp 可能跑不只一次：只掛一次
+  navPressWired = true;
+  const up = ()=> $$('button.press', nav).forEach(b=>b.classList.remove('press'));
+  nav.addEventListener('pointerdown', e=>{
+    const b = e.target.closest && e.target.closest('button');
+    if(b && nav.contains(b) && (e.button === 0 || e.pointerType !== 'mouse')) b.classList.add('press');
+  });
+  ['pointerup','pointercancel','pointerleave'].forEach(t=>nav.addEventListener(t, up));
+  window.addEventListener('blur', up);
 }
 function render(){
+  // 勾完成的那一列還在等沉底（HOLD_MS）時有別的重畫進來（同步拉完、換主題…）：直接把那一趟做掉。
+  // 它重畫的就是這一頁（換頁前一定先 flush），不這樣做的話這次重畫會先把列排好，那一趟就沒得動
+  if(motionPending){ flushMotion(); setSync(); return; }
   if(state.page==='list'){ renderFilters(); renderList(); }
   else if(state.page==='cal'){ renderCal(); }
   else if(state.page==='task'){ renderTaskFilters(); renderTasks(); }
@@ -4225,6 +4696,7 @@ async function startApp(){
 
   // 事件
   $$('#nav button').forEach(b=>b.onclick = ()=>setPage(b.dataset.p));
+  wireNavPress();
   $('#btn-menu').onclick = e=>{ e.stopPropagation(); openMenu(); };
   $('#fab').onclick = ()=>{
     if(state.page==='list') openScheduleForm(null);
@@ -4236,6 +4708,7 @@ async function startApp(){
   $('#cal-prev').onclick = ()=>{ shiftMonth(-1); };
   $('#cal-next').onclick = ()=>{ shiftMonth(1); };
   $('#cal-today').onclick = ()=>{
+    flushMotion();
     const d = new Date();
     state.calY = d.getFullYear(); state.calM = d.getMonth(); state.selDate = todayStr();
     renderCal();
@@ -4259,6 +4732,7 @@ async function startApp(){
   }
 }
 function shiftMonth(n){
+  flushMotion();
   let y = state.calY, m = state.calM + n;
   if(m < 0){ m = 11; y--; } if(m > 11){ m = 0; y++; }
   state.calY = y; state.calM = m;
