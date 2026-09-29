@@ -472,7 +472,8 @@ span.star svg{width:100%;height:100%;display:block}
 
 .calbar{display:flex;align-items:center;gap:var(--s-3);margin:0 0 var(--s-4)}
 .calbar .mo{font-size:var(--t-xl);font-weight:700;letter-spacing:.03em;min-width:134px;
-  text-align:center;font-variant-numeric:tabular-nums}
+  text-align:center;font-variant-numeric:tabular-nums;overflow:hidden}
+.calbar .mo>span{display:inline-block}
 .calbar .sp{flex:1}
 .tbtn{border:1px solid var(--line);background:var(--card);border-radius:999px;
   height:32px;padding:0 14px;font-size:var(--t-sm);color:var(--ink2);box-shadow:var(--sh-1);
@@ -1748,6 +1749,8 @@ function readStoredQueue(){
       const base = legacyQid(op), n = nth.get(base) || 0;
       nth.set(base, n + 1);
       op.qid = base + '-' + n;
+      // 舊版（c64acd8）寫的沒有時間：第一次讀到時補「現在」，排在已經排隊的之後、彼此維持原順序
+      if(!op.at) op.at = Date.now();
     }
     return arr.filter(op => op && op.qid);
   }catch(e){ return []; }
@@ -1859,7 +1862,8 @@ function enqueue(op){
   // 已經排隊的這一筆，各分頁手上的同一筆也才會一模一樣（否則分頁間會為了誰的版本對而互相改寫）
   if(op.row) op.row = JSON.parse(JSON.stringify(op.row));
   op.qid = newQid();
-  op.at = Date.now();
+  // 時間戳嚴格遞增：手機時鐘被往回調（長時間離線後的 NTP 校時）也不會讓後做的操作排到前面
+  op.at = Math.max(Date.now(), mergedQueue().reduce((mx, q) => Math.max(mx, q.at || 0), 0) + 1);
   queue.push(op);
   saveQueue(); setSync();
   flushQueue();
@@ -2125,8 +2129,9 @@ function resync(){
   })().catch(e => console.warn('resync failed', e)).finally(()=>{ resyncP = null; });
   return resyncP;
 }
-/** 畫面開著時每分鐘同步一次：兩台裝置同時開著也會跟上（沒變就不重畫，很便宜） */
-const SYNC_EVERY_MS = 60000;
+/** 畫面開著時每 3 分鐘同步一次：兩台裝置同時開著也會跟上（沒變就不重畫）。
+    每次是六張表全量拉取，間隔拉長省流量；切回前景、連上網路時本來就會立刻同步 */
+const SYNC_EVERY_MS = 180000;
 let syncTimer = null;
 function startPeriodicSync(){
   if(syncTimer) return;
@@ -2460,7 +2465,19 @@ let lastDayKey = null, lastMonKey = null;
 function renderCal(){
   const y = state.calY, m = state.calM;
   const LIM = CELL_CHIPS;
-  $('#cal-mo').textContent = `${y} 年 ${m+1} 月`;
+  // 換月方向：往後的月份＝往上捲（+1）、往前＝往下捲（-1）
+  const monDir = (()=>{
+    if(lastMonKey === null || lastMonKey === `${y}-${m}`) return 0;
+    const [py, pm] = lastMonKey.split('-').map(Number);
+    return (y * 12 + m) > (py * 12 + pm) ? 1 : -1;
+  })();
+  const moEl = $('#cal-mo'), moTxt = `${y} 年 ${m+1} 月`;
+  if(monDir && !reduceMotion()){
+    // 月份標題跟月曆同方向上下換字（不淡出）
+    moEl.innerHTML = `<span>${moTxt}</span>`;
+    try{ moEl.firstChild.animate([{ transform:`translateY(${monDir * 100}%)` }, { transform:'none' }],
+                                 { duration: 380, easing: motionEase() }); }catch(e){}
+  }else moEl.textContent = moTxt;
 
   const first = new Date(y, m, 1);
   const start = new Date(y, m, 1 - first.getDay());
@@ -2535,7 +2552,8 @@ function renderCal(){
   const monKey = `${y}-${m}`, monChanged = lastMonKey !== null && lastMonKey !== monKey;
   lastMonKey = monKey;
   const gridEl = $('#cal-grid');
-  gridEl.classList.toggle('swap', monChanged);
+  const scroll = monChanged ? monthScrollBegin(gridEl, monDir) : null;
+  gridEl.classList.toggle('swap', monChanged && !scroll);     // 不能捲（減少動態、畫面沒顯示）才退回淡入
   gridEl.innerHTML = weeksHtml.join('');
 
   $$('.cell', $('#cal-grid')).forEach(c=>c.onclick = ()=>{
@@ -2560,6 +2578,68 @@ function renderCal(){
     openDetail({kind:'event', row:e, mode:'calendar', date:d});
   });
   renderDay();
+  if(scroll) scroll.play();
+}
+
+/* 換月：週是連續的，所以把舊月份與新月份的週接成一條（重疊的那一週只出現一次），在裁切的框裡整條上下捲——
+   往後一個月時，舊月份的最後一行（例如 9/27–10/3）正好捲到新月份的第一行；往前則反過來。不淡出。
+   舊月份獨有的那幾行是複製出來的（不能點、讀屏略過），捲完就拿掉；新月份的格子是真的，事件都已經掛好。 */
+let calScroll = null;
+function monthScrollBegin(grid, dir){
+  if(calScroll) calScroll.finish();            // 快速連點 ‹ ›：前一趟直接做完，從最新的月份再捲
+  if(!grid || !dir || reduceMotion() || grid.offsetParent === null) return null;
+  const weeksOf = () => [...grid.children].filter(el => el.classList.contains('week'));
+  const keyOf = w => { const c = w.querySelector('.cell'); return c ? c.dataset.d : ''; };
+  const oldWeeks = weeksOf();
+  if(!oldWeeks.length) return null;
+  const old = oldWeeks.map(w => ({ key: keyOf(w), el: w.cloneNode(true) }));
+  const oldH = grid.getBoundingClientRect().height;
+  return { play(){
+    const newWeeks = weeksOf();
+    if(!newWeeks.length) return;
+    const newH = grid.getBoundingClientRect().height;
+    const newKeys = new Set(newWeeks.map(keyOf));
+    const ghosts = old.filter(o => !newKeys.has(o.key)).map(o => {
+      o.el.setAttribute('aria-hidden', 'true'); o.el.inert = true; o.el.style.pointerEvents = 'none';
+      return o;
+    });
+    if(dir > 0) ghosts.forEach(o => grid.insertBefore(o.el, newWeeks[0]));
+    else ghosts.forEach(o => grid.appendChild(o.el));
+    // 裁切框：暫時包住格線，高度從舊月份的行數過渡到新月份的
+    const vp = document.createElement('div');
+    vp.style.cssText = `overflow:hidden;height:${oldH}px;position:relative`;
+    grid.parentNode.insertBefore(vp, grid); vp.appendChild(grid);
+    grid.style.position = 'relative';
+    const top0 = weeksOf()[0].offsetTop;
+    const oldFirst = newKeys.has(old[0].key) ? newWeeks.find(w => keyOf(w) === old[0].key) : old[0].el;
+    const from = dir > 0 ? 0 : -(oldFirst.offsetTop - top0);
+    const to   = dir > 0 ? -(newWeeks[0].offsetTop - top0) : 0;
+    const ease = motionEase(), dur = 540;
+    let done = false, anims = [];
+    const finish = () => {
+      if(done) return; done = true;
+      anims.forEach(a => { try{ a.cancel(); }catch(e){} });
+      ghosts.forEach(o => o.el.remove());
+      grid.style.position = '';
+      if(vp.parentNode){ vp.parentNode.insertBefore(grid, vp); vp.remove(); }
+      if(calScroll === st) calScroll = null;
+    };
+    const st = { finish };
+    calScroll = st;
+    try{
+      anims = [
+        grid.animate([{ transform:`translateY(${from}px)` }, { transform:`translateY(${to}px)` }],
+                     { duration: dur, easing: ease, fill:'forwards' }),
+        vp.animate([{ height:`${oldH}px` }, { height:`${newH}px` }], { duration: dur, easing: ease, fill:'forwards' })
+      ];
+      anims[0].onfinish = () => {
+        finish();
+        // 選取的那一格落地後輕彈一下
+        const sel = grid.querySelector('.cell.sel');
+        try{ sel && sel.animate([{ transform:'scale(1.12)' }, { transform:'none' }], { duration: 320, easing: ease }); }catch(e){}
+      };
+    }catch(e){ finish(); }
+  } };
 }
 
 /* ============================================================
