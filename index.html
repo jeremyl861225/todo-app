@@ -251,14 +251,23 @@ header.top{
    它的底色與陰影照抄 .nav button.on（手機是 --accent-soft，見下方手機區塊）。
    isolation 讓 .nav 自成一層：膠囊用 z-index:-1 墊在按鈕文字底下，但仍在 .nav 自己的底色之上。 */
 .nav{position:relative;isolation:isolate}
-.nav button{transition:background var(--d-2),color var(--d-2),box-shadow var(--d-2),transform var(--spring-d) var(--spring)}
+.nav button{position:relative;transition:background var(--d-2),color var(--d-2),box-shadow var(--d-2),transform var(--spring-d) var(--spring)}
 .nav button.press{transform:scale(.92)}
+/* 按下時整顆縮到 .92，但可以點的範圍不能跟著縮：否則在按鈕側邊幾 px 內放開，點擊會落到 .nav 上、換不了頁
+   （觸控的 click 在放開後才補發，那時按鈕還在彈回的路上，一樣會落空）。
+   這層透明的 ::after 蓋滿按鈕，用同一條彈簧反向放大 1/.92：兩者相乘在整段縮放與彈回期間都約等於 1，
+   可點的範圍始終是原本那一格（圓角跟著按鈕，角落外照舊點不到）。縮放後的邊緣在瀏覽器裡會有零點幾 px 的
+   對齊誤差，所以按住與彈回期間再往外多撐 1px，寧可多一點、不可少一點。
+   沒有底色、不參與排版，平常就是按鈕本身的大小，看不見也不改變任何東西 */
+.nav button::after{content:'';position:absolute;inset:0;border-radius:inherit;
+  transition:transform var(--spring-d) var(--spring),inset var(--spring-d) var(--spring)}
+.nav button.press::after{inset:-1px;transform:scale(1.087)}
 .nav-ind{position:absolute;left:0;top:0;width:0;height:0;z-index:-1;border-radius:999px;pointer-events:none;display:none}
 .nav-ind>span{position:absolute;inset:0;border-radius:inherit;background:var(--card);box-shadow:var(--sh-1)}
 .nav.ind-run .nav-ind{display:block}
 .nav.ind-run button{transition:color var(--d-2),transform var(--spring-d) var(--spring)}
 .nav.ind-run button.on{background:transparent;box-shadow:none}
-.nav.ind-snap button{transition:none !important}
+.nav.ind-snap button, .nav.ind-snap button::after{transition:none !important}
 
 main{padding:var(--s-6) 0 var(--s-9)}
 
@@ -2016,7 +2025,7 @@ function renderTaskFilters(){
   renderChipBar($('#fl-task'), state.tasks.filter(t=>!isArchived(t)),
     state.taskFilter, state.taskImpOnly, (f,i)=>{
       state.taskFilter = f; state.taskImpOnly = i;
-      renderTasks(); renderTaskFilters();
+      redrawList(()=>{ renderTasks(); renderTaskFilters(); });
     });
 }
 
@@ -2456,9 +2465,12 @@ function flipPlay(root, sel, keyOf, first, liftKeys, riseKey){
         el.classList.add('row-lift');
         const dur = Math.round(Math.min(780, 540 + Math.hypot(dx, dy) * .3));
         liftingUntil.set(k, now + dur);
+        // 放大 3.5%，但每邊最多長 7px：寬的列（760–939px 的當日清單約 680px）放大整整 3.5% 會超出
+        // .dlist 的 8px 內距，捲動容器就會冒出一閃而過的橫向捲軸
+        const s = Math.min(1.035, 1 + 14 / Math.max(1, b.width)).toFixed(4);
         const anim = el.animate([
           { transform:`translate(${dx}px,${dy}px) scale(1)`, easing:'cubic-bezier(.3,.7,.4,1)' },
-          { transform:`translate(${(dx*.94).toFixed(1)}px,${(dy*.94).toFixed(1)}px) scale(1.035)`, offset:.16, easing:ease },
+          { transform:`translate(${(dx*.94).toFixed(1)}px,${(dy*.94).toFixed(1)}px) scale(${s})`, offset:.16, easing:ease },
           { transform:'none' }
         ], { duration: dur });
         anim.onfinish = land; anim.oncancel = land;
@@ -2497,6 +2509,11 @@ function flushMotion(){
   clearTimeout(p.timer);
   runMotion(p);
 }
+/** 直接重畫清單的地方（篩選條、詳細內容裡的子事項…）用這個：剛勾的那一列還在等沉底（HOLD_MS）時，
+    改由等待中的那一趟代為重畫，這次的變動跟著沉底一起動。不這樣的話這次重畫會先把列排好，
+    那一趟就沒得動，刪除線還會被切回去重畫一截。等待中的一定是目前這一頁的清單（換頁前會先 flush），
+    它的重畫（render／renderCal）涵蓋這一頁所有直接重畫的範圍；沒有在等的就照常重畫 */
+function redrawList(fn){ if(motionPending) flushMotion(); else fn(); }
 function runMotion(b){
   const root0 = b.root();
   const first = flipFirst(root0, b.sel, b.keyOf);
@@ -2676,7 +2693,8 @@ function wireTaskCards(root){
       });
       toast(done ? `已完成，兩天後移入「已完成」` : '已取消完成');
     };
-    $('[data-act=open]', card).onclick = ()=> openTaskDetail(t);
+    // 同理：剛勾完、卡片還沒重畫（HOLD_MS 內）就點開，要用目前的資料畫面板
+    $('[data-act=open]', card).onclick = ()=> openTaskDetail(state.tasks.find(x=>x.id===t.id) || t);
   });
 }
 
@@ -3158,7 +3176,7 @@ function openDetail({kind, row, mode, date}){
       toggleSubDone(row.id, kind, b.dataset.sub, date);
       box.innerHTML = subsPanelHTML(row, kind, date);
       wireSubBtns();
-      renderCal(); renderDay();      // 後面的月曆與當日清單同步更新
+      redrawList(()=>{ renderCal(); renderDay(); });      // 後面的月曆與當日清單同步更新
     });
   };
   wireSubBtns();
@@ -3172,7 +3190,7 @@ function openDetail({kind, row, mode, date}){
     const el = date === state.selDate
       ? $$('#dp-list .drow').find(e=>e.dataset.id === row.id && e.dataset.k === kind) : null;
     if(el) dayCheckMotion(row.id, kind, date, el, $('[data-act=ck]', el), wasDone);
-    else renderCal();
+    else redrawList(renderCal);
   };
 
   /* 單次挪動：選好日期後只寫進這條排程的 moves 例外，規則本身不動 */
@@ -3181,6 +3199,7 @@ function openDetail({kind, row, mode, date}){
     const pick = $('#mv-pick', m.ov), saveB = $('#mv-save', m.ov);
     let mdp = null;
     const jump = to => {
+      flushMotion();          // 換日之前先把等待中的沉底做掉（跟點月曆格子一樣）
       state.selDate = to;
       const d = parseYmd(to);
       state.calY = d.getFullYear(); state.calM = d.getMonth();
@@ -4495,6 +4514,7 @@ function wireNavPress(){
   if(!nav || navPressWired) return;   // startApp 可能跑不只一次：只掛一次
   navPressWired = true;
   const up = ()=> $$('button.press', nav).forEach(b=>b.classList.remove('press'));
+  // 縮小中可點範圍不縮：見 CSS 的 .nav button::after
   nav.addEventListener('pointerdown', e=>{
     const b = e.target.closest && e.target.closest('button');
     if(b && nav.contains(b) && (e.button === 0 || e.pointerType !== 'mouse')) b.classList.add('press');
