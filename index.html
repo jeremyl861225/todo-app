@@ -1622,6 +1622,13 @@ const state = {
 };
 const queue = [];   // 待上傳操作
 let flushing = false;
+let flushP = null;           // 進行中的 flushQueue()（同時被叫很多次時大家等同一趟）
+let pullP = null;            // 進行中的 pullAll()
+let pullAgain = false;       // 這次拉取作廢或被擋下，佇列清空後要再拉一次
+let localRev = 0;            // 本機每多一筆變更就 +1；拉取途中有變就丟掉那份快照
+let appStarted = false;      // startApp() 只能跑一次
+let leaving = false;         // 我們自己要 reload／登出，不要再跳「尚未上傳」確認
+let AUTH_KEY = '';           // supabase-js 存 session 的 localStorage 鍵（main 裡算出）
 
 const cfgKey  = 'todo.cfg.v1';
 const cacheKey = () => 'todo.cache.' + (session?.user?.id || 'anon');
@@ -1654,15 +1661,124 @@ function loadCache(){
     return true;
   }catch(e){ return false; }
 }
+/* ---------- 上傳佇列：同一個瀏覽器開好幾個分頁時共用 ----------
+   儲存格式與舊版相同（todo.queue.<uid> 是一個操作陣列），每筆只多兩個欄位：qid（這筆的身分）與 at（加入時間）。
+   舊版每個分頁各拿記憶體裡的整份佇列寫回，後寫的蓋掉先寫的：分頁 A 離線新增的變更，
+   被分頁 B 下一次寫入整個抹掉，再也送不上去。現在：
+   - 任何增刪都是「讀出儲存的 → 併進記憶體裡的 → 扣掉已送出的 → 寫回」
+   - 送出（或被伺服器退回而放棄）的 qid 記在 todo.qdone.<uid>（最近 400 筆），
+     別的分頁手上的舊副本不會把它加回來
+   - 其他分頁改了佇列或本機快取：storage 事件 → 重新讀進記憶體；快取讀進來後疊上佇列裡還沒送的變更
+   - 同一時間只讓一個分頁送（navigator.locks；不支援的瀏覽器各送各的，upsert／delete 重送一次無害） */
+const qdoneKey = () => 'todo.qdone.' + (session?.user?.id || 'anon');
+const localSent = new Set();        // 這個分頁送出／放棄過的 qid（qdone 寫不進去時也擋得住）
+const newQid = () => {
+  try{ if(crypto.randomUUID) return crypto.randomUUID(); }catch(e){}
+  return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+};
+/** 舊版寫進去、沒有 qid 的操作：用內容算一個固定的 qid（每個分頁算出來都一樣） */
+function legacyQid(op){
+  const s = JSON.stringify(op);
+  let h = 5381;
+  for(let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return 'L-' + h.toString(36) + '-' + s.length.toString(36);
+}
+function readStoredQueue(){
+  try{
+    const arr = JSON.parse(localStorage.getItem(queueKey()) || '[]');
+    if(!Array.isArray(arr)) return [];
+    // 內容一模一樣的舊操作（離線時勾→取消→勾，第 1 筆和第 3 筆就一樣）要算成不同的幾筆：
+    // qid 帶上「這是第幾個同內容的」，否則合併時只留一筆，最後的狀態會送錯
+    const nth = new Map();
+    for(const op of arr){
+      if(!op || typeof op !== 'object' || op.qid) continue;
+      const base = legacyQid(op), n = nth.get(base) || 0;
+      nth.set(base, n + 1);
+      op.qid = base + '-' + n;
+    }
+    return arr.filter(op => op && op.qid);
+  }catch(e){ return []; }
+}
+function readSent(){
+  try{ const a = JSON.parse(localStorage.getItem(qdoneKey()) || '[]'); return Array.isArray(a) ? a : []; }
+  catch(e){ return []; }
+}
+/** 儲存的 ∪ 記憶體裡的 − 已送出的，依加入時間排（同一筆以記憶體裡的物件為準） */
+function mergedQueue(){
+  const sent = new Set(readSent());
+  for(const q of localSent) sent.add(q);
+  const mine = new Map(queue.map(op => [op.qid, op]));
+  const out = [], seen = new Set();
+  const add = op => {
+    if(!op || !op.qid || sent.has(op.qid) || seen.has(op.qid)) return;
+    seen.add(op.qid); out.push(mine.get(op.qid) || op);
+  };
+  readStoredQueue().forEach(add);
+  queue.forEach(add);
+  // 穩定排序：同一個時間（或舊版沒有時間）維持原順序
+  return out.map((op, i) => [op, i])
+    .sort((a, b) => ((a[0].at || 0) - (b[0].at || 0)) || (a[1] - b[1]))
+    .map(x => x[0]);
+}
 function saveQueue(){
   if(!session) return;
-  try{ localStorage.setItem(queueKey(), JSON.stringify(queue)); }catch(e){}
+  const q = mergedQueue();
+  queue.length = 0; queue.push(...q);
+  try{
+    const s = JSON.stringify(q);
+    if(localStorage.getItem(queueKey()) !== s) localStorage.setItem(queueKey(), s);
+  }catch(e){}
 }
 function loadQueue(){
+  queue.length = 0;       // 以儲存的為準；重複呼叫也不會把佇列複製一倍
+  saveQueue();
+}
+/** 這一筆已經送出（或放棄）：記下來，從佇列拿掉 */
+function queueDone(op){
+  localSent.add(op.qid);
   try{
-    const raw = localStorage.getItem(queueKey());
-    if(raw){ const arr = JSON.parse(raw); if(Array.isArray(arr)) queue.push(...arr); }
+    const a = readSent();
+    a.push(op.qid);
+    localStorage.setItem(qdoneKey(), JSON.stringify(a.slice(-400)));
   }catch(e){}
+  saveQueue();
+}
+/** 被伺服器明確退回（重送也不會過）而放棄的變更：留一份在本機（最近 50 筆），
+    「匯出備份 JSON」會一起帶出去，至少還救得回來，不會就這樣消失 */
+const rejectedKey = () => 'todo.rejected.' + (session?.user?.id || 'anon');
+function readRejected(){
+  try{ const a = JSON.parse(localStorage.getItem(rejectedKey()) || '[]'); return Array.isArray(a) ? a : []; }
+  catch(e){ return []; }
+}
+function keepRejected(op, err){
+  try{
+    const a = readRejected();
+    a.push({ at: new Date().toISOString(), op, error: String(err?.message || err || ''), status: err?.status });
+    localStorage.setItem(rejectedKey(), JSON.stringify(a.slice(-50)));
+  }catch(e){}
+}
+/** 資料表名 → state 裡的陣列 */
+const TABLE_STATE = { schedules:'schedules', events:'events', completions:'completions',
+                      categories:'categories', tasks:'tasks', sub_done:'subDone' };
+/** 把佇列裡還沒送出的變更疊到 state 上。本機快取可能被另一個分頁用它那份（少了這邊的變更）蓋過，
+    佇列才是「還沒上雲端的變更」的正本；疊上去後畫面與快取就不會少掉它們。回傳改了幾筆。 */
+function overlayQueue(){
+  let n = 0;
+  for(const op of queue){
+    const k = TABLE_STATE[op.table];
+    if(!k || !Array.isArray(state[k])) continue;
+    const arr = state[k];
+    if(op.type === 'upsert' && op.row && op.row.id != null){
+      const i = arr.findIndex(x => x.id === op.row.id);
+      if(i < 0){ arr.push({ ...op.row }); n++; }
+      else if(JSON.stringify(arr[i]) !== JSON.stringify(op.row)){ arr[i] = { ...op.row }; n++; }
+    }else if(op.type === 'delete' && op.id != null){
+      const i = arr.findIndex(x => x.id === op.id);
+      if(i >= 0){ arr.splice(i, 1); n++; }
+    }
+  }
+  if(n){ rebuildDoneIndex(); rebuildSubIndex(); }
+  return n;
 }
 
 const isDemo = () => session?.user?.id === 'demo-user';
@@ -1672,9 +1788,12 @@ function setSync(){
   const set = (cls, txt, title)=>{ el.className = cls; t.textContent = txt; el.title = title; };
   // 試用模式根本沒有雲端，別讓它看起來像同步好了
   if(isDemo())              set('pill idle','僅本機','試用模式：資料只存在這台裝置');
-  else if(queue.length)     set('pill warn', `待上傳 ${queue.length}`, '有變更還沒送上雲端');
+  else if(queue.length)     set('pill warn', `待上傳 ${queue.length}`, navigator.onLine
+      ? '有變更還沒送上雲端（剛恢復連線時要先換發登入憑證，最多約等一分鐘）' : '有變更還沒送上雲端');
   else if(!state.online)    set('pill warn', '離線', '目前離線，顯示的是本機資料');
-  else if(flushing || state.pulling) set('pill idle','同步中','正在與雲端對帳');
+  // 每分鐘的背景拉取不要讓狀態閃成「同步中」：兩分鐘內才剛對過帳就維持原狀
+  else if(flushing || (state.pulling && !(state.syncedAt && Date.now() - state.syncedAt < 120000)))
+                            set('pill idle','同步中','正在與雲端對帳');
   else if(state.syncErr)    set('pill warn','同步異常','有變更被伺服器退回，請重新同步');
   // 佇列空不等於同步好：這次開啟還沒成功拉回伺服器資料就不能說已同步
   else if(!state.syncedAt)  set('pill warn','未同步','還沒成功連上雲端，顯示的是本機資料');
@@ -1682,50 +1801,113 @@ function setSync(){
 }
 
 function enqueue(op){
+  localRev++;                       // 拉取途中有新變更 → 那份快照作廢（見 pullAll）
+  // 佇列裡存的是當下的快照，不是 state 裡那個活物件：之後原地改到它（例如類別換色）不會悄悄改掉
+  // 已經排隊的這一筆，各分頁手上的同一筆也才會一模一樣（否則分頁間會為了誰的版本對而互相改寫）
+  if(op.row) op.row = JSON.parse(JSON.stringify(op.row));
+  op.qid = newQid();
+  op.at = Date.now();
   queue.push(op);
   saveQueue(); setSync();
   flushQueue();
 }
+/** 送出一筆。失敗時丟出帶 HTTP status 的錯誤（status 0 = 根本沒送到：離線、逾時、沒有登入憑證） */
 async function applyOp(op){
-  if(op.type === 'upsert'){
-    const { error } = await sb.from(op.table).upsert(op.row);
-    if(error) throw error;
-  }else if(op.type === 'delete'){
-    const { error } = await sb.from(op.table).delete().eq('id', op.id);
-    if(error) throw error;
+  let r = null;
+  if(op.type === 'upsert')      r = await sb.from(op.table).upsert(op.row);
+  else if(op.type === 'delete') r = await sb.from(op.table).delete().eq('id', op.id);
+  if(r && r.error){
+    const e = r.error;
+    throw { message: String(e.message || e), code: e.code, details: e.details,
+            status: typeof r.status === 'number' ? r.status : undefined };
   }
 }
-async function flushQueue(){
-  if(flushing || !queue.length || !sb || !session) return;
+/* 上傳失敗怎麼處理，看 HTTP 狀態而不是猜訊息：
+   - 'auth' ：401（token 過期或失效）→ 留在佇列，順手換一次 token
+   - 'retry'：沒送到或暫時性問題（0＝離線／逾時／沒有登入憑證、402、407、408、425、429、5xx）→ 留在佇列稍後再送
+   - 'drop' ：其餘 4xx＝伺服器明確拒絕、重送也不會過（違反限制、欄位不存在、權限政策…）→ 丟掉並提示
+   絕不能因為網路或登入的小狀況就把使用者的變更丟掉（以前訊息裡有 JWT 就當永久錯誤丟掉）。 */
+function opFailureKind(err){
+  const msg = String(err?.message || err || '');
+  const st = typeof err?.status === 'number' ? err.status : null;
+  if(st === 401) return 'auth';
+  if(st === 0 || st === 402 || st === 407 || st === 408 || st === 425 || st === 429 || st >= 500) return 'retry';
+  if(st >= 400) return 'drop';
+  // 沒有 HTTP 狀態（不是 PostgREST 回的錯）：只有訊息明確是資料問題才丟
+  if(/AbortError|TimeoutError|Failed to fetch|Load failed|NetworkError/i.test(msg)) return 'retry';
+  return /violat|invalid|constraint|column|schema|does not exist|permission|policy/i.test(msg) ? 'drop' : 'retry';
+}
+let lastForcedRefresh = 0;
+function refreshTokenSoon(){
+  if(isDemo() || !sb || !sb.auth || typeof sb.auth.refreshSession !== 'function') return;
+  const now = Date.now();
+  if(now - lastForcedRefresh < 60000) return;      // supabase-js 自己對同一個 refresh token 也有 60 秒冷卻
+  lastForcedRefresh = now;
+  // 換到新 token 會發 TOKEN_REFRESHED，事件處理會再同步一次。
+  // 排到下一輪再叫：在 auth 事件處理中同步呼叫 refreshSession 會互等（supabase-js 文件警告）
+  setTimeout(()=>{ Promise.resolve().then(()=>sb.auth.refreshSession()).catch(()=>{}); }, 0);
+}
+let flushBusyTimer = null;
+function flushQueue(){
+  if(flushP) return flushP;                        // 已經在送：等同一趟（新加的會被同一個迴圈接著送）
+  if(!queue.length || !sb || !session) return Promise.resolve();
   flushing = true; setSync();
-  while(queue.length){
-    const op = queue[0];
-    try{
-      await applyOp(op);
-      queue.shift(); saveQueue();
-    }catch(err){
-      const msg = String(err?.message || err || '');
-      // 另一台裝置已經勾過同一天：視為成功，不用吵使用者
-      const dupCompletion = op.table === 'completions' && /duplicate|unique/i.test(msg);
-      const permanent = /violat|invalid|constraint|column|schema|does not exist|permission|policy|JWT/i.test(msg);
-      if(dupCompletion){
-        queue.shift(); saveQueue();
-      }else if(permanent){
-        queue.shift(); saveQueue();
-        state.syncErr = true;
-        toast('有一筆資料上傳失敗：' + msg, true);
-      }else{
-        flushing = false; setSync();
-        return;                       // 網路問題，保留佇列稍後重試
+  let stalled = false, busy = false;
+  const loop = async ()=>{
+    saveQueue();                                   // 先跟儲存的對齊：別的分頁加的一起送、已送的不重送
+    while(queue.length){
+      const op = queue[0];
+      try{
+        await applyOp(op);
+        queueDone(op);
+      }catch(err){
+        const msg = String(err?.message || err || '');
+        // 另一台裝置已經勾過同一天：視為成功，不用吵使用者
+        if(op.table === 'completions' && /duplicate|unique/i.test(msg)){
+          queueDone(op); continue;
+        }
+        const kind = opFailureKind(err);
+        if(kind === 'drop'){
+          keepRejected(op, err);
+          queueDone(op);
+          state.syncErr = true;
+          toast('有一筆資料上傳失敗：' + msg, true);
+          continue;
+        }
+        if(kind === 'auth') refreshTokenSoon();
+        stalled = true;
+        return;                                    // 網路或登入問題：保留佇列，稍後重試
       }
     }
-  }
-  flushing = false; setSync();
+  };
+  // 同一時間只讓一個分頁送；別的分頁正在送就交給它（它每送一筆都會重讀儲存的佇列，這邊加的也會送到）。
+  // 它剛好收尾、沒讀到這邊新加的：過兩秒這邊再試一次
+  let useLock = false;
+  try{ useLock = !!(navigator.locks && navigator.locks.request); }catch(e){}
+  const run = useLock
+    ? navigator.locks.request('todo.flush.' + (session?.user?.id || 'anon'), { ifAvailable: true },
+        lock => lock ? loop() : (busy = stalled = true))
+    : loop();
+  flushP = Promise.resolve(run)
+  .catch(e => { stalled = true; console.warn('flush failed', e); }).finally(()=>{
+    flushing = false; flushP = null; setSync();
+    if(busy && queue.length && !flushBusyTimer){
+      flushBusyTimer = setTimeout(()=>{ flushBusyTimer = null; flushQueue(); }, 2000);
+      return;
+    }
+    // 迴圈剛結束的空檔又有人加了變更：接著送
+    if(!stalled && queue.length){ setTimeout(flushQueue, 0); return; }
+    // 佇列清空了：之前因為還有變更沒送而延後的拉取，現在補做
+    if(!queue.length && pullAgain){ pullAgain = false; pullAll(); }
+  });
+  return flushP;
 }
 
 /* ---------- 資料表版本檢查 ----------
-   起訖日與「自訂」頻率需要新欄位；沒升級就會寫入失敗，先擋在前面提醒。 */
+   起訖日與「自訂」頻率需要新欄位；沒升級就會寫入失敗，先擋在前面提醒。
+   離線時不查（查了也只是一路重試），第一次同步成功後才查，查完一次就不再查。 */
 let schemaReady = true;
+let schemaChecked = false, schemaChecking = false;
 const MIGRATIONS = [
   { file:'2026-08-recurrence.sql',
     checks:[['schedules','end_date,interval_n,custom_unit'], ['events','end_date']] },
@@ -1741,33 +1923,65 @@ const MIGRATIONS = [
     checks:[['schedules','subtasks'], ['events','subtasks'], ['sub_done','sub_id']] }
 ];
 async function checkSchema(){
-  if(!sb || !session) return;
-  const missing = [];
-  for(const m of MIGRATIONS){
-    for(const [t, cols] of m.checks){
-      try{
+  if(!sb || !session || schemaChecked || schemaChecking) return;
+  if(isDemo()){ schemaChecked = true; return; }    // 試用模式沒有資料表可查
+  schemaChecking = true;
+  try{
+    const missing = [];
+    for(const m of MIGRATIONS){
+      for(const [t, cols] of m.checks){
         const r = await sb.from(t).select(cols).limit(1);
-        if(r.error && /column|does not exist|schema/i.test(String(r.error.message||''))){
+        if(!r.error) continue;
+        // 沒送到（離線、逾時、token 換不到）或伺服器暫時出錯：先不判斷，下次同步成功後再查
+        const st = r.status;
+        if(!st || st === 401 || st === 408 || st === 429 || st >= 500) return;
+        if(/column|does not exist|schema/i.test(String(r.error.message||''))){
           missing.push(m.file); break;
         }
-      }catch(err){ return; }   // 查不動（離線、試用模式）就先不判斷，別讓啟動流程斷掉
+      }
     }
-  }
-  if(!missing.length) return;
-  schemaReady = false;
-  const bar = document.createElement('div');
-  bar.className = 'schemabar';
-  bar.innerHTML = `<b>資料表需要升級</b>
-    請到 Supabase → SQL Editor 依序執行 ${missing.map(f=>`<code>migrations/${f}</code>`).join('、')}，
-    否則新增／修改會存不起來。執行完重新整理這個頁面即可。`;
-  document.querySelector('#scr-app').prepend(bar);
+    schemaChecked = true;
+    if(!missing.length) return;
+    schemaReady = false;
+    const bar = document.createElement('div');
+    bar.className = 'schemabar';
+    bar.innerHTML = `<b>資料表需要升級</b>
+      請到 Supabase → SQL Editor 依序執行 ${missing.map(f=>`<code>migrations/${f}</code>`).join('、')}，
+      否則新增／修改會存不起來。執行完重新整理這個頁面即可。`;
+    document.querySelector('#scr-app').prepend(bar);
+  }catch(err){ /* 查不動就先不判斷，別讓啟動流程斷掉 */ }
+  finally{ schemaChecking = false; }
 }
 
 /* ---------- 讀取 ---------- */
-async function pullAll(){
-  if(!sb || !session) return;
+/** 目前有沒有真正的使用者 token。沒有的話 supabase-js 會改拿 publishable key 當 Bearer，等於匿名查詢 */
+async function hasUserToken(){
+  if(isDemo()) return true;
+  try{
+    const { data } = await sb.auth.getSession();
+    return !!(data && data.session && data.session.access_token);
+  }catch(e){ return false; }
+}
+let pullFails = 0;          // 連續失敗次數：只在第一次失敗時提示，定期拉取不要每分鐘吵一次
+let pullDay = '';           // 上次拉完重畫時是哪一天（跨日要重畫「今天」）
+function pullAll(){
+  if(!sb || !session) return Promise.resolve();
+  if(pullP) return pullP;                          // 已經在拉：等同一趟
+  // 還有本機變更沒送出：先不拉（拉回來也只能丟掉），flushQueue 送完會補拉
+  if(queue.length){ pullAgain = true; return Promise.resolve(); }
+  pullP = doPull().finally(()=>{
+    pullP = null;
+    if(pullAgain && !queue.length){ pullAgain = false; setTimeout(pullAll, 0); }
+  });
+  return pullP;
+}
+async function doPull(){
   state.pulling = true; setSync();
   try{
+    // 匿名查詢在 RLS 下會回 0 筆且不報錯，拿那份空資料蓋掉本機就等於清空，所以沒 token 就不拉
+    if(!(await hasUserToken())){ state.syncedAt = 0; return; }
+    if(queue.length){ pullAgain = true; return; }  // 等 token 的期間又有新變更
+    const rev0 = localRev;
     const [a,b,c,d,e,f] = await Promise.all([
       sb.from('schedules').select('*'),
       sb.from('events').select('*'),
@@ -1778,31 +1992,56 @@ async function pullAll(){
     ]);
     const bad = [a,b,c,d].find(r=>r.error);
     if(bad){ throw bad.error; }
-    if(queue.length) return;          // 有未上傳的變更，先不要覆蓋本機
-    state.schedules  = a.data || [];
-    state.events     = b.data || [];
-    state.completions= c.data || [];
-    state.categories = d.data || [];
-    // tasks 是後來才加的資料表：還沒跑 migration 的帳號讀不到，
-    // 這時保留本機既有的內容就好，不要讓整包同步失敗（頂端會有紅色提示列）
-    if(!e.error) state.tasks = e.data || [];
-    // sub_done 同理，是更後面才加的表
-    if(!f.error) state.subDone = f.data || [];
-    migrateCatColors();
-    rebuildDoneIndex(); rebuildSubIndex();
+    // 拉取途中本機有新變更：伺服器這份快照可能比本機舊，蓋上去會讓剛勾好的項目跳回原狀。
+    // 丟掉，等佇列送完再拉一次。
+    if(queue.length || localRev !== rev0){ pullAgain = true; return; }
+    const next = {
+      schedules: a.data || [], events: b.data || [],
+      completions: c.data || [], categories: d.data || [],
+      // tasks 是後來才加的資料表：還沒跑 migration 的帳號讀不到，
+      // 這時保留本機既有的內容就好，不要讓整包同步失敗（頂端會有紅色提示列）
+      tasks: e.error ? state.tasks : (e.data || []),
+      // sub_done 同理，是更後面才加的表
+      subDone: f.error ? state.subDone : (f.data || [])
+    };
+    const cur = { schedules: state.schedules, events: state.events,
+                  completions: state.completions, categories: state.categories,
+                  tasks: state.tasks, subDone: state.subDone };
+    const changed = JSON.stringify(next) !== JSON.stringify(cur);
+    const firstPull = !state.loaded;
+    if(changed){
+      state.schedules  = next.schedules;
+      state.events     = next.events;
+      state.completions= next.completions;
+      state.categories = next.categories;
+      state.tasks      = next.tasks;
+      state.subDone    = next.subDone;
+      migrateCatColors();
+      rebuildDoneIndex(); rebuildSubIndex();
+    }
     state.loaded = true;
     state.syncedAt = Date.now();      // 這一刻本機與伺服器一致，才算真的同步好
     state.syncErr = false;
-    saveCache();
-    render();
+    state.online = true;              // 真的拉得到就是有網路（iOS 的 online 事件不一定準）
+    pullFails = 0;
+    // 第一次拉完一定存：saveCache → wfTouch，順手把小工具快照更新成今天
+    const day = todayStr();
+    if(changed || firstPull) saveCache();
+    else if(day !== pullDay) wfTouch();   // 開著跨日：資料沒變，小工具快照的「今天」仍要更新
+    // 沒變就不重畫：每分鐘的定期拉取不該打斷動畫或輸入；跨日則要重畫「今天」
+    if(changed || day !== pullDay) render();
+    pullDay = day;
   }catch(err){
     console.warn('pull failed', err);
+    pullFails++;
     const msg = String(err?.message||err||'');
-    if(/does not exist|schema/i.test(msg)){
-      toast('資料表尚未建立，請先在 Supabase 執行 schema.sql', true);
-    }else if(navigator.onLine){
-      // 離線是正常狀況，右上角的狀態已經說明了，不用再跳錯誤
-      toast('連線失敗，顯示的是最後同步的資料', true);
+    if(pullFails === 1){
+      if(/does not exist|schema/i.test(msg)){
+        toast('資料表尚未建立，請先在 Supabase 執行 schema.sql', true);
+      }else if(navigator.onLine){
+        // 離線是正常狀況，右上角的狀態已經說明了，不用再跳錯誤
+        toast('連線失敗，顯示的是最後同步的資料', true);
+      }
     }
     state.syncedAt = 0;               // 沒拉成功就不能再掛著「已同步」
   }finally{
@@ -1810,6 +2049,39 @@ async function pullAll(){
     state.pulling = false;
     setSync();
   }
+}
+
+/* ---------- 同步一輪：送出佇列 → 拉回伺服器 → 補做離線時跳過的事 ----------
+   開機、網路回來、token 換新、回到前景、每分鐘定期，全部走這裡；一次只跑一輪。 */
+let resyncP = null, resyncAgain = false;
+function resync(){
+  if(!sb || !session || !appStarted) return Promise.resolve();
+  if(resyncP){ resyncAgain = true; return resyncP; }
+  resyncP = (async ()=>{
+    do{
+      resyncAgain = false;
+      // 離線開機時讀不到小工具設定（wfState 停在 idle），連上後補讀，否則這次開啟都不會推快照
+      if(wfState === 'idle' && !isDemo()) await wfLoad();
+      await flushQueue();     // 先把離線期間的變更送上去，再拉回伺服器版本
+      await pullAll();
+      if(state.syncedAt){
+        if(!schemaChecked) await checkSchema();
+        if(wfDirty) wfTouch();   // 上次推小工具快照沒推上去（離線時編輯）：連上後補推
+      }
+    }while(resyncAgain);
+  })().catch(e => console.warn('resync failed', e)).finally(()=>{ resyncP = null; });
+  return resyncP;
+}
+/** 畫面開著時每分鐘同步一次：兩台裝置同時開著也會跟上（沒變就不重畫，很便宜） */
+const SYNC_EVERY_MS = 60000;
+let syncTimer = null;
+function startPeriodicSync(){
+  if(syncTimer) return;
+  syncTimer = setInterval(()=>{
+    if(document.hidden || !navigator.onLine) return;
+    if(resyncP || pullP || flushP) return;
+    resync();
+  }, SYNC_EVERY_MS);
 }
 
 /* ---------- 寫入 ---------- */
@@ -3443,12 +3715,25 @@ function openMenu(){
   menuEl.querySelector('[data-a=import]').onclick = ()=>{ closeMenu(); openImportMenu(); };
   menuEl.querySelector('[data-a=export]').onclick = ()=>{ closeMenu(); exportJSON(); };
   menuEl.querySelector('[data-a=pw]').onclick     = ()=>{ closeMenu(); openPasswordForm(); };
-  menuEl.querySelector('[data-a=out]').onclick    = async ()=>{
-    closeMenu();
-    if(queue.length && !confirm(`還有 ${queue.length} 筆變更未上傳，仍要登出嗎？`)) return;
-    await sb.auth.signOut();
-    location.reload();
-  };
+  menuEl.querySelector('[data-a=out]').onclick    = ()=>{ closeMenu(); signOutFlow(); };
+}
+/* 登出。離線時 supabase-js 的 signOut 有兩種結局：token 已過期就什麼都不做（重新整理後又回到 App，
+   看起來像登出壞了）；token 還有效則只刪本機、伺服器不知道。所以離線時不走 signOut，
+   而是先講清楚，使用者確認後才刻意清掉這台裝置的登入資料。
+   未上傳的變更留在這台裝置（依帳號分開存），下次用同一個帳號登入就會自動送出。 */
+async function signOutFlow(){
+  if(queue.length && !confirm(`還有 ${queue.length} 筆變更未上傳，仍要登出嗎？\n（變更會留在這台裝置，下次用同一個帳號登入時自動上傳）`)) return;
+  if(isDemo()){ await sb.auth.signOut(); reloadApp(); return; }
+  if(navigator.onLine){
+    toast('登出中…');
+    let res = null;
+    try{ res = await sb.auth.signOut(); }catch(e){ res = { error:e }; }
+    // 成功、伺服器明確拒絕（token 早已失效），或本機 session 已被 supabase-js 清掉：直接回登入頁
+    if(!res || !res.error || !isNetAuthError(res.error) || !readStoredSession()){ reloadApp(); return; }
+  }
+  if(!confirm('目前離線，無法通知雲端登出。\n仍要登出這台裝置嗎？登出後要連上網路才能再登入。')) return;
+  try{ if(AUTH_KEY) localStorage.removeItem(AUTH_KEY); }catch(e){}
+  reloadApp();
 }
 /* ---------- 匯入 ---------- */
 function normLinks(v){
@@ -3716,6 +4001,8 @@ function exportJSON(){
   const data = { exported_at:new Date().toISOString(), email:session?.user?.email,
     schedules:state.schedules, events:state.events, tasks:state.tasks,
     completions:state.completions, subDone:state.subDone, categories:state.categories };
+  const rejected = readRejected();
+  if(rejected.length) data.rejected = rejected;     // 被伺服器退回、沒上到雲端的變更（見 keepRejected）
   const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -3742,6 +4029,7 @@ const WF_DEBOUNCE = 2000;  // 連續編輯時，最後一次過多久才推
 let wfRow = null;          // widget_feeds 的那一列 {id, token}；null = 尚未啟用
 let wfState = 'idle';      // idle | ready | absent | unsupported
 let wfTimer = null, wfSending = false, wfAgain = false;
+let wfDirty = false;       // 最後一次推送沒推上去（離線、逾時、token 換不到）：下次同步成功時補推
 
 /** 32 個字元的 base64url 亂數，對得上 Edge Function 的 /^[A-Za-z0-9_-]{24,128}$/ */
 function wfMakeToken(){
@@ -3847,11 +4135,15 @@ async function wfPush(){
   if(wfSending){ wfAgain = true; return; }   // 正在送就記一筆，送完再補一次
   wfSending = true;
   try{
-    await sb.from('widget_feeds')
+    const r = await sb.from('widget_feeds')
       .update({ payload: wfBuild(), updated_at: new Date().toISOString() })
       .eq('id', wfRow.id);
+    // PostgREST 的錯誤不會丟例外，而是放在 r.error（離線時也是）
+    wfDirty = !!(r && r.error);
+    if(wfDirty) console.warn('widget feed push failed', r.error);
   }catch(e){
-    // 推不上去不影響 App 本身；下次編輯或下次開啟 App 都會重推
+    // 推不上去不影響 App 本身；下次同步成功、下次編輯或下次開啟 App 都會重推
+    wfDirty = true;
     console.warn('widget feed push failed', e);
   }
   wfSending = false;
@@ -4051,6 +4343,74 @@ function show(id){
   $(id).classList.remove('hide');
   document.body.classList.toggle('app-on', id==='#scr-app');
 }
+/** 重新整理回到起點（登出、換帳號）。是我們自己要走的，不要再跳「尚未上傳」的離開確認 */
+function reloadApp(){
+  leaving = true;
+  location.reload();
+}
+
+/* ---------- 離線優先：登入狀態與網路 ----------
+   supabase-js 把 session 存在 localStorage 的 sb-<專案>-auth-token（預設鍵，SupabaseClient 用網址第一段組出來）。
+   千萬別改 storageKey：改了所有裝置都會被登出。 */
+const authStorageKey = url => `sb-${new URL(url).hostname.split('.')[0]}-auth-token`;
+/** 本機存著的 session（不碰網路）。要有 refresh token 與使用者 id 才算數 */
+function readStoredSession(){
+  if(!AUTH_KEY) return null;
+  try{
+    const s = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null');
+    return (s && s.access_token && s.refresh_token && s.expires_at && s.user && s.user.id) ? s : null;
+  }catch(e){ return null; }
+}
+/** 可以重試的連線錯誤（離線、逾時、伺服器 5xx），不是「帳號真的被登出」 */
+function isNetAuthError(err){
+  if(!err) return false;
+  try{ if(window.supabase && window.supabase.isAuthRetryableFetchError(err)) return true; }catch(e){}
+  return err.name === 'AuthRetryableFetchError' ||
+    /Failed to fetch|Load failed|NetworkError|AbortError|TimeoutError/i.test(String(err.message || err));
+}
+/* 所有 Supabase 請求（登入、換 token、資料表）都經過這裡：
+   1. 絕不以匿名身分打資料表：沒有使用者 token 時 supabase-js 會拿 publishable key 當 Bearer，
+      RLS 讓匿名查到 0 筆卻不報錯（pullAll 會拿空資料蓋掉本機）、寫入被拒（變更被當成永久錯誤丟掉）。
+      直接以 AbortError 拒絕：PostgREST 不會重試 AbortError，呼叫端拿到 status 0，當成「沒送到」保留重試。
+   2. 每個請求都有逾時：Wi‑Fi 連得上卻沒網路時 fetch 可能一直卡著。 */
+const NET_TIMEOUT_MS = 15000;
+function makeNetFetch(anonKey){
+  const anonBearer = 'Bearer ' + anonKey;
+  return function netFetch(input, init){
+    init = init || {};
+    let url = '';
+    try{ url = typeof input === 'string' ? input : (input && (input.href || input.url)) || String(input); }catch(e){}
+    if(url.indexOf('/rest/v1/') !== -1){
+      let auth = '';
+      try{ auth = new Headers(init.headers || (input && input.headers) || undefined).get('Authorization') || ''; }catch(e){}
+      if(!auth || auth === anonBearer)
+        return Promise.reject(new DOMException('沒有登入憑證，暫不連線', 'AbortError'));
+    }
+    let signal = init.signal, timer = null;
+    const hasTimeout = typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function';
+    if(hasTimeout && (!signal || typeof AbortSignal.any === 'function')){
+      const t = AbortSignal.timeout(NET_TIMEOUT_MS);
+      signal = signal ? AbortSignal.any([signal, t]) : t;
+    }else{
+      // 舊版 Safari 沒有 AbortSignal.timeout／any：自己接一個
+      const ctl = new AbortController(), outer = signal;
+      timer = setTimeout(()=>ctl.abort(), NET_TIMEOUT_MS);
+      if(outer){
+        if(outer.aborted) ctl.abort();
+        else outer.addEventListener('abort', ()=>ctl.abort(), { once:true });
+      }
+      signal = ctl.signal;
+    }
+    return fetch(input, Object.assign({}, init, { signal })).then(
+      res => res,
+      err => {
+        if(timer) clearTimeout(timer);
+        // 逾時一律當 AbortError：PostgREST 對 TimeoutError 的 GET 會再重試三次（最多再卡一分鐘）
+        if(err && err.name === 'TimeoutError') throw new DOMException('連線逾時', 'AbortError');
+        throw err;
+      });
+  };
+}
 
 function getConfig(){
   if(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) return {...CONFIG};
@@ -4118,6 +4478,9 @@ function initAuthScreen(){
     if(!email){ err.textContent='請填寫 Email。'; err.classList.remove('hide'); return; }
     if(mode!=='forgot' && !pw){ err.textContent='請填寫密碼。'; err.classList.remove('hide'); return; }
     if(mode==='up' && pw.length < 6){ err.textContent='密碼至少 6 個字元。'; err.classList.remove('hide'); return; }
+    const offlineMsg = mode==='forgot' ? '目前離線，請連線後再寄送重設信。'
+      : mode==='up' ? '目前離線，請連線後再建立帳號。' : '目前離線，請連線後再登入。';
+    if(!navigator.onLine){ err.textContent = offlineMsg; err.classList.remove('hide'); return; }
     btn.disabled = true; btn.textContent = '處理中…';
     try{
       if(mode==='forgot'){
@@ -4149,7 +4512,10 @@ function initAuthScreen(){
       }
     }catch(e2){
       const msg = String(e2?.message||e2);
-      err.textContent = /Invalid login/i.test(msg) ? 'Email 或密碼不正確。'
+      const st = e2?.status;
+      err.textContent = isNetAuthError(e2)
+          ? (st >= 500 ? '伺服器暫時無法連線，請稍後再試。' : offlineMsg)
+        : /Invalid login/i.test(msg) ? 'Email 或密碼不正確。'
         : /already registered/i.test(msg) ? '這個 Email 已經註冊過了，請直接登入。'
         : /Email not confirmed/i.test(msg) ? '請先到信箱點擊確認信中的連結。'
         : /rate limit|too many/i.test(msg) ? '嘗試太頻繁，請等幾分鐘再試。'
@@ -4191,11 +4557,16 @@ function initResetScreen(){
   };
 }
 
+/* 只能跑一次：以前 onAuthStateChange 與 getSession 各叫一次，佇列被載入兩份、監聽器綁兩次。
+   開機不等網路：資料一律先從本機快取畫出來，同步在背景做。 */
 async function startApp(){
+  if(appStarted) return;
+  appStarted = true;
   show('#scr-app');
   loadQueue();
   const hadCache = loadCache();
   if(hadCache) migrateCatColors();
+  overlayQueue();         // 快取可能被別的分頁用少了這些變更的版本蓋過：佇列裡還沒送的疊回來
 
   const now = new Date();
   state.calY = now.getFullYear();
@@ -4247,10 +4618,10 @@ async function startApp(){
   // debounce 還在等的時候把 App 切走，就當場補送，別讓那次變更留到下次開啟才上去
   document.addEventListener('visibilitychange', ()=>{ if(document.hidden && wfTimer) wfPush(); });
 
-  await wfLoad();       // 有沒有啟用桌面小工具（沒有的話後面的推送全是空操作）
-  await flushQueue();   // 先把離線期間的變更送上去，再拉回伺服器版本
-  await pullAll();      // 拉完會 saveCache → wfTouch，順手把小工具快照更新成今天
-  await checkSchema();
+  startPeriodicSync();
+  // 讀小工具設定 → 送出離線期間的變更 → 拉回伺服器版本（拉完會 saveCache → wfTouch，
+  // 順手把小工具快照更新成今天）→ 第一次同步成功後檢查資料表版本。離線時這些都安靜地失敗，之後再補。
+  await resync();
 
   // 首次使用：建立預設類別
   if(state.loaded && !state.categories.length && !state.schedules.length && !state.tasks.length){
@@ -4268,13 +4639,32 @@ function shiftMonth(n){
   renderCal();
 }
 
-window.addEventListener('online',  ()=>{ state.online = true;  setSync(); flushQueue(); pullAll(); });
+/* 另一個分頁改了上傳佇列或本機快取（見「上傳佇列」那段說明）：讀進記憶體、重畫，
+   否則這個分頁下一次寫入會把對方的變更蓋掉 */
+window.addEventListener('storage', e=>{
+  if(!appStarted || !session || e.storageArea !== localStorage) return;
+  if(e.key === queueKey() || e.key === qdoneKey()){
+    localRev++;                    // 拉取途中別的分頁加了變更：那份伺服器快照作廢
+    saveQueue(); setSync();
+    // 別的分頁把佇列送完了：這邊之前因為佇列沒清空而延後的拉取，現在補做
+    if(!queue.length && pullAgain && !flushP && !pullP){ pullAgain = false; pullAll(); }
+  }else if(e.key === cacheKey() && e.newValue){
+    if(!loadCache()) return;
+    overlayQueue();
+    // 勾選的動畫還在等重畫（motion 分支的 flushMotion）：先做掉再整頁重畫
+    if(typeof flushMotion === 'function') flushMotion();
+    render();
+  }
+});
+
+// 網路回來：先送再拉，不要同時跑（同時跑時較舊的伺服器快照會蓋掉剛送出的變更）
+window.addEventListener('online',  ()=>{ state.online = true;  setSync(); resync(); });
 window.addEventListener('offline', ()=>{ state.online = false; setSync(); });
 document.addEventListener('visibilitychange', ()=>{
-  if(document.visibilityState === 'visible' && session){ flushQueue().then(()=>pullAll()); }
+  if(document.visibilityState === 'visible') resync();
 });
 window.addEventListener('beforeunload', e=>{
-  if(queue.length){ e.preventDefault(); e.returnValue = ''; }
+  if(queue.length && !leaving){ e.preventDefault(); e.returnValue = ''; }
 });
 
 /* 試用模式：網址加上 ?demo=1，資料只存在這台裝置的瀏覽器，
@@ -4330,8 +4720,10 @@ const DEMO_SESSION = { user:{ id:'demo-user', email:'試用模式（僅存在本
   }
   // detectSessionInUrl 要開著，重設密碼的信件連結才會被接住
   sbUrl = String(cfg.SUPABASE_URL||'').replace(/\/+$/,'');
+  AUTH_KEY = authStorageKey(cfg.SUPABASE_URL);
   sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
-    auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true }
+    auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true },
+    global:{ fetch: makeNetFetch(cfg.SUPABASE_ANON_KEY) }
   });
 
   // 連結本身就帶錯誤（例如已過期）
@@ -4341,25 +4733,58 @@ const DEMO_SESSION = { user:{ id:'demo-user', email:'試用模式（僅存在本
   if(linkErr) history.replaceState(null, '', appUrl());
 
   sb.auth.onAuthStateChange((evt, s)=>{
-    const had = !!session;
-    session = s;
     if(evt === 'PASSWORD_RECOVERY'){
+      session = s;
       recovering = true;
       history.replaceState(null, '', appUrl());
       initResetScreen();
       return;
     }
-    if(recovering) return;                 // 設新密碼期間不要被其他事件帶走
-    if(!had && s){ startApp(); }
-    if(had && !s){ location.reload(); }
+    if(recovering){ session = s; return; }   // 設新密碼期間不要被其他事件帶走
+    if(s){
+      // 別的分頁換了帳號：整個重來，不要把兩個人的資料混在一起
+      if(appStarted && session?.user?.id && s.user?.id && s.user.id !== session.user.id){
+        session = s; reloadApp(); return;
+      }
+      const fresh = !session || session.access_token !== s.access_token;
+      session = s;
+      if(!appStarted){ startApp(); return; }
+      // 換到新 token（多半是網路回來了）：補同步一次。排到下一輪，不在 auth 事件處理中直接打 API
+      if(fresh && (evt === 'TOKEN_REFRESHED' || evt === 'SIGNED_IN')) setTimeout(resync, 0);
+      return;
+    }
+    // 真的被登出（refresh token 失效、另一個分頁登出）：回登入頁。
+    // 還沒進 App 時不用處理，下面 getSession() 的結果會決定要顯示什麼。
+    if(evt === 'SIGNED_OUT'){ if(appStarted) reloadApp(); return; }
+    // 其餘沒有 session 的事件（例如離線時的 INITIAL_SESSION）只代表「現在換不到 token」，不是登出
   });
 
-  const { data } = await sb.auth.getSession();
-  session = data?.session || null;
+  // 離線優先：本機存著登入資料就立刻用快取開 App，不等網路。
+  // token 過期又離線時 getSession() 要重試約 25 秒才回 null，以前這段時間畫面全白，之後還會卡在登入頁。
+  // 從信件連結進來（重設密碼、確認信：網址帶 access_token）或連結帶錯誤時照舊，等 getSession() 的結果再決定畫面：
+  // 連結裡的可能是另一個帳號，不能先用本機存的那個開 App。
+  const fromLink = isRecovery || !!linkErr || !!hash.get('access_token');
+  const stored = fromLink ? null : readStoredSession();
+  if(stored){ session = stored; startApp(); }
+
+  let res;
+  try{ res = await sb.auth.getSession(); }catch(e){ res = { data:{ session:null }, error:e }; }
+  const s = res?.data?.session || null;
 
   if(recovering) return;                   // PASSWORD_RECOVERY 已經接手
-  if(isRecovery && session){ recovering = true; history.replaceState(null,'',appUrl()); initResetScreen(); return; }
-  if(session){ startApp(); return; }
+  if(isRecovery && s){ session = s; recovering = true; history.replaceState(null,'',appUrl()); initResetScreen(); return; }
+  if(s){
+    if(!appStarted || !session || session.user?.id === s.user?.id) session = s;
+    if(!appStarted) startApp();
+    return;
+  }
+  if(appStarted){
+    // 已經用快取開著 App：換不到 token 只是離線或伺服器暫時不通，留在 App 裡，網路回來再同步
+    if(res?.error && isNetAuthError(res.error)) return;
+    // 不是連線問題卻沒有 session：本機登入資料已失效（通常 SIGNED_OUT 已經觸發 reload）
+    if(!readStoredSession()) reloadApp();
+    return;
+  }
 
   initAuthScreen();
   if(linkErr){
