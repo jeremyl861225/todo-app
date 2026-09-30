@@ -1868,6 +1868,21 @@ function enqueue(op){
   saveQueue(); setSync();
   flushQueue();
 }
+/** 一次排很多筆（匯入還原、刪掉帶著大量完成紀錄的項目）：時間戳一樣嚴格遞增，但整批只存一次、只叫一次送出。
+    逐筆 enqueue 每一筆都要重讀、重寫整個佇列，兩千筆會讓畫面卡住好幾秒 */
+function enqueueMany(ops){
+  if(!ops.length) return;
+  localRev++;
+  let at = Math.max(Date.now(), mergedQueue().reduce((mx, q) => Math.max(mx, q.at || 0), 0) + 1);
+  for(const op of ops){
+    if(op.row) op.row = JSON.parse(JSON.stringify(op.row));
+    op.qid = newQid();
+    op.at = at++;
+    queue.push(op);
+  }
+  saveQueue(); setSync();
+  flushQueue();
+}
 /** 送出一筆。失敗時丟出帶 HTTP status 的錯誤（status 0 = 根本沒送到：離線、逾時、沒有登入憑證） */
 async function applyOp(op){
   let r = null;
@@ -2159,9 +2174,9 @@ function deleteSchedule(id){
   const goneSub = state.subDone.filter(x=>x.item_id===id);
   state.subDone = state.subDone.filter(x=>x.item_id!==id);
   rebuildDoneIndex(); rebuildSubIndex(); saveCache();
-  enqueue({type:'delete', table:'schedules', id});
-  for(const c of gone) enqueue({type:'delete', table:'completions', id:c.id});
-  for(const x of goneSub) enqueue({type:'delete', table:'sub_done', id:x.id});
+  enqueueMany([{type:'delete', table:'schedules', id},
+    ...gone.map(c=>({type:'delete', table:'completions', id:c.id})),
+    ...goneSub.map(x=>({type:'delete', table:'sub_done', id:x.id}))]);
 }
 function saveEvent(row){
   row.user_id = session.user.id;
@@ -2175,9 +2190,9 @@ function deleteEvent(id){
   const goneSub = state.subDone.filter(x=>x.item_id===id);
   state.subDone = state.subDone.filter(x=>x.item_id!==id);
   rebuildDoneIndex(); rebuildSubIndex(); saveCache();
-  enqueue({type:'delete', table:'events', id});
-  for(const c of gone) enqueue({type:'delete', table:'completions', id:c.id});
-  for(const x of goneSub) enqueue({type:'delete', table:'sub_done', id:x.id});
+  enqueueMany([{type:'delete', table:'events', id},
+    ...gone.map(c=>({type:'delete', table:'completions', id:c.id})),
+    ...goneSub.map(x=>({type:'delete', table:'sub_done', id:x.id}))]);
 }
 function saveTask(row){
   row.user_id = session.user.id;
@@ -4250,6 +4265,7 @@ function normTask(t){
     links: normLinks(t.links)
   };
 }
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function parseImport(data){
   if(!data || typeof data !== 'object') return null;
   const sch = (Array.isArray(data.schedules) ? data.schedules : []).map(normSchedule).filter(Boolean);
@@ -4261,11 +4277,30 @@ function parseImport(data){
   for(const e of evt) if(e.category && !cat.includes(e.category)) cat.push(e.category);
   for(const t of tsk) if(t.category && !cat.includes(t.category)) cat.push(t.category);
   if(!sch.length && !evt.length && !tsk.length) return null;
-  // 子事項的逐日勾選：只收那些項目真的還在的，避免匯進孤兒紀錄
-  const ids = new Set([...sch, ...evt].map(x=>x.id));
-  const sd = (Array.isArray(data.subDone) ? data.subDone : []).filter(x=>
-    x && ids.has(x.item_id) && x.sub_id && isYmd(x.occur_date));
-  return { schedules:sch, events:evt, tasks:tsk, categories:cat, subDone:sd,
+  // 子事項的逐日勾選、勾選完成紀錄（匯出備份裡有）：
+  // - 只收項目真的在檔案裡的，避免匯進孤兒紀錄；日期要是真的日期（2026-02-30 伺服器會退回）
+  // - 同一筆（項目＋日期，子事項再加 sub_id）只留一筆；種類看項目屬於哪一邊，不信檔案裡寫的
+  // - 編號不是 UUID、或在檔案裡重複的，先記成 null，套用時再給新的
+  const kindOf = new Map([...sch.map(x=>[x.id,'schedule']), ...evt.map(x=>[x.id,'event'])]);
+  const realYmd = v => isYmd(v) && ymd(parseYmd(v)) === v;
+  const idSeen = new Set();
+  const cleanId = v => { const k = String(v||'').toLowerCase(); if(!UUID_RE.test(k) || idSeen.has(k)) return null; idSeen.add(k); return k; };   // uuid 不分大小寫
+  const pick = (list, keyOf) => {
+    const seen = new Set();
+    return (Array.isArray(list) ? list : []).filter(x=>{
+      if(!x || !kindOf.has(x.item_id) || !realYmd(x.occur_date)) return false;
+      const k = keyOf(x);
+      if(seen.has(k)) return false;
+      seen.add(k); return true;
+    });
+  };
+  const sd = pick((Array.isArray(data.subDone) ? data.subDone : []).filter(x=>x && x.sub_id),
+                  x=>x.item_id + '|' + x.sub_id + '|' + x.occur_date)
+    .map(x=>({ id: cleanId(x.id), item_id: x.item_id, item_kind: kindOf.get(x.item_id),
+               sub_id: String(x.sub_id), occur_date: x.occur_date }));
+  const cp = pick(data.completions, x=>doneKey(x.item_id, x.occur_date))
+    .map(x=>({ id: cleanId(x.id), item_id: x.item_id, item_kind: kindOf.get(x.item_id), occur_date: x.occur_date }));
+  return { schedules:sch, events:evt, tasks:tsk, categories:cat, subDone:sd, completions:cp,
            source:String(data.source||'') };
 }
 function applyImport(p){
@@ -4286,15 +4321,31 @@ function applyImport(p){
     (state.tasks.some(x=>x.id===t.id) ? (updT++) : (addT++));
     saveTask(t);
   }
+  // 逐日勾選（子事項、完成紀錄）：這一天已經勾過的就不動。編號沿用備份裡的（刪掉再還原會是同一筆），
+  // 但本機已經有同編號的另一筆（例如備份之後那一次改過期，紀錄跟著搬走了）就給新的，免得蓋掉它
+  const ops = [];
+  const usedSd = new Set(state.subDone.map(x=>String(x.id).toLowerCase()));
   for(const x of (p.subDone||[])){
     if(isSubDone(x.item_id, x.sub_id, x.occur_date)) continue;
-    const row = { id: x.id || uid(), user_id: session.user.id, item_id: x.item_id,
-                  item_kind: x.item_kind === 'schedule' ? 'schedule' : 'event',
-                  sub_id: String(x.sub_id), occur_date: x.occur_date };
+    const row = { id: x.id && !usedSd.has(x.id) ? x.id : uid(), user_id: session.user.id, item_id: x.item_id,
+                  item_kind: x.item_kind, sub_id: x.sub_id, occur_date: x.occur_date };
+    usedSd.add(row.id);
     state.subDone.push(row);
-    enqueue({type:'upsert', table:'sub_done', row});
+    ops.push({type:'upsert', table:'sub_done', row});
   }
-  rebuildSubIndex(); saveCache();
+  let addC = 0;
+  const usedC = new Set(state.completions.map(c=>String(c.id).toLowerCase()));
+  for(const x of (p.completions||[])){
+    if(isDone(x.item_id, x.occur_date)) continue;
+    const row = { id: x.id && !usedC.has(x.id) ? x.id : uid(), user_id: session.user.id, item_id: x.item_id,
+                  item_kind: x.item_kind, occur_date: x.occur_date };
+    usedC.add(row.id);
+    state.completions.push(row);
+    ops.push({type:'upsert', table:'completions', row});
+    addC++;
+  }
+  enqueueMany(ops);
+  rebuildDoneIndex(); rebuildSubIndex(); saveCache();
   render();
   const bits = [];
   if(addS) bits.push(`新增 ${addS} 筆排程`);
@@ -4304,6 +4355,7 @@ function applyImport(p){
   if(addT) bits.push(`新增 ${addT} 筆任務`);
   if(updT) bits.push(`更新 ${updT} 筆任務`);
   if(newCat) bits.push(`新增 ${newCat} 個類別`);
+  if(addC) bits.push(`還原 ${addC} 筆完成紀錄`);
   toast(bits.length ? '匯入完成：' + bits.join('、') : '沒有任何變更');
 }
 function openImportPreview(p, label){
@@ -4320,12 +4372,14 @@ function openImportPreview(p, label){
   const dupe = p.schedules.filter(s=>state.schedules.some(x=>x.id===s.id)).length
              + p.events.filter(e=>state.events.some(x=>x.id===e.id)).length
              + (p.tasks||[]).filter(t=>state.tasks.some(x=>x.id===t.id)).length;
+  const willC = (p.completions||[]).filter(x=>!isDone(x.item_id, x.occur_date)).length;   // 已經勾過的會略過
   const m = modal({
     title:'確認匯入',
     body:`<p class="hint" style="margin:0 0 12px">
         來源：${esc(label)}${p.source?`<br>${esc(p.source)}`:''}<br>
         共 <b>${p.schedules.length}</b> 筆重複排程、<b>${p.events.length}</b> 筆單一行程、
-        <b>${(p.tasks||[]).length}</b> 筆任務、<b>${p.categories.length}</b> 個類別。
+        <b>${(p.tasks||[]).length}</b> 筆任務、<b>${p.categories.length}</b> 個類別${
+        willC?`，並還原 <b>${willC}</b> 筆完成紀錄`:''}。
         ${dupe?`其中 <b>${dupe}</b> 筆已存在，會被覆蓋成檔案裡的版本。`:'不會覆蓋你現有的資料。'}
       </p>
       <div style="display:flex;flex-direction:column;gap:6px">${rows}</div>`,
